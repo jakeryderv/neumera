@@ -49,3 +49,17 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - name: Publish to PyPI
         run: uv publish --trusted-publishing always 'wheels-*/*'
+
+  github-release:
+    name: Create GitHub Release
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      # Used to create the release and upload assets
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+      - name: Create release with generated notes
+        run: gh release create "$GITHUB_REF_NAME" wheels-*/* --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes
+        env:
+          GH_TOKEN: ${{ github.token }}

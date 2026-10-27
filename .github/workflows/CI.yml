@@ -184,3 +184,53 @@ jobs:
         with:
           name: wheels-sdist
           path: dist
+
+  # Install the built wheels and run the test suite against them, on every
+  # platform where the runner can execute the wheel natively.
+  test-wheels:
+    needs: [linux, macos, windows]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
+        platform:
+          - runner: ubuntu-22.04
+            artifact: wheels-linux-x86_64
+          - runner: macos-15-intel
+            artifact: wheels-macos-x86_64
+          - runner: macos-latest
+            artifact: wheels-macos-aarch64
+          - runner: windows-latest
+            artifact: wheels-windows-x64
+          - runner: windows-11-arm
+            artifact: wheels-windows-aarch64
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/download-artifact@v8
+        with:
+          name: ${{ matrix.platform.artifact }}
+          path: dist
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+          activate-environment: true
+          no-project: true
+      - name: Install wheel
+        shell: bash
+        run: |
+          uv pip install pytest
+          uv pip install --no-index --find-links dist neumera
+          python -c "import neumera; print(neumera.__file__)"
+      - name: Run tests
+        run: python -m pytest
+
+  # Single required status check that summarizes every job above
+  ci-ok:
+    if: always()
+    needs: [check, linux, musllinux, windows, macos, sdist, test-wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail unless all jobs succeeded
+        if: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}
+        run: exit 1

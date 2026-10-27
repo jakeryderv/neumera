@@ -4,6 +4,9 @@
 default:
     @just --list
 
+# One-time setup: install dependencies, build the extension, enable git hooks
+setup: hooks dev
+
 # Sync Python dependencies
 sync:
     uv sync
@@ -30,6 +33,7 @@ test: dev
 
 # Lint Python and Rust
 lint:
+    uv lock --check
     uv run ruff check .
     uv run ty check
     cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
@@ -53,3 +57,20 @@ check: dev fmt-check lint test
 # Build Python source and wheel distributions
 build:
     uv build
+
+
+# --- Releasing ------------------------------------------------
+
+# Bump the version, run checks, then commit and tag locally (pushing is manual)
+release version:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ -n "$(git status --porcelain)" ]]; then echo "error: working tree is not clean" >&2; exit 1; fi
+    if [[ "$(git branch --show-current)" != main ]]; then echo "error: not on main" >&2; exit 1; fi
+    if git rev-parse -q --verify "refs/tags/v{{version}}" >/dev/null; then echo "error: tag v{{version}} already exists" >&2; exit 1; fi
+    sed -i '0,/^version = ".*"$/s//version = "{{version}}"/' rust/Cargo.toml
+    just check
+    git add rust/Cargo.toml rust/Cargo.lock
+    git commit -m "chore: release {{version}}"
+    git tag "v{{version}}"
+    echo "Tagged v{{version}}. To publish: git push origin main && git push origin v{{version}}"
