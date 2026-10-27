@@ -1,11 +1,22 @@
 [project]
 name = "neumera"
+description = "Foundational implementations and utilities for machine learning, numerical computing, and optimization."
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+license-files = ["LICENSE-*"]
+authors = [{ name = "Jake Van Slyke" }]
 requires-python = ">=3.12,<3.15"
 classifiers = [
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
   "Programming Language :: Python :: Implementation :: CPython",
   "Programming Language :: Rust",
 ]
 dynamic = ["version"]
+
+[project.urls]
+Repository = "https://github.com/jakeryderv/neumera"
 
 [build-system]
 requires = ["maturin>=1.15,<2.0"]

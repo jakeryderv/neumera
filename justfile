@@ -8,6 +8,10 @@ default:
 sync:
     uv sync
 
+# Enable the repo's git hooks (pre-commit runs fmt-check and lint)
+hooks:
+    git config core.hooksPath .githooks
+
 # Rebuild and reinstall the Rust extension, regenerating type stubs
 dev:
     uv sync --no-install-project

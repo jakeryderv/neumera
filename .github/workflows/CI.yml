@@ -15,16 +15,32 @@ on:
 permissions:
   contents: read
 
+# Cancel superseded runs on the same ref, but never a tag (release) run
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
 jobs:
   check:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.14"]
     steps:
       - uses: actions/checkout@v6
-      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
         with:
-          components: clippy, rustfmt
+          workspaces: rust
+          key: py${{ matrix.python-version }}
       - uses: astral-sh/setup-uv@v7
-      - uses: extractions/setup-just@v3
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
       - name: Run checks
         run: just check
       - name: Check type stubs are up to date
