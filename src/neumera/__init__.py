@@ -1,6 +1,3 @@
-from .neumera import *
+from ._core import sum_as_string
 
-
-__doc__ = neumera.__doc__
-if hasattr(neumera, "__all__"):
-    __all__ = neumera.__all__
+__all__ = ["sum_as_string"]

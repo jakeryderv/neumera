@@ -11,9 +11,17 @@ dynamic = ["version"]
 requires = ["maturin>=1.15,<2.0"]
 build-backend = "maturin"
 
+[tool.maturin]
+manifest-path = "rust/Cargo.toml"
+python-source = "src"
+module-name = "neumera._core"
+
 [dependency-groups]
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.17.3",
     "ty>=0.0.92",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
