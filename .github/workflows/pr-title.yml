@@ -1,0 +1,20 @@
+# PRs are squash-merged with the PR title as the commit message, so the title
+# must follow Conventional Commits. Uses the same check as the commit-msg hook.
+name: PR title
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  pr-title:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check PR title follows Conventional Commits
+        env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: printf '%s\n' "$TITLE" | scripts/check-commit-msg.sh

@@ -1,0 +1,3 @@
+#!/bin/sh
+# Enabled by `just hooks`. Bypass with `git commit --no-verify`.
+exec scripts/check-commit-msg.sh "$1"

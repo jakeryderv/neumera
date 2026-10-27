@@ -35,7 +35,7 @@ Run `just` to list all recipes.
 | `just lint` | Lockfile check, ruff, ty, clippy |
 | `just check` | Everything CI's check job runs: build, format check, lint, tests |
 
-Run `just dev` after changing Rust code. The pre-commit hook runs `just fmt-check lint`; bypass it with `git commit --no-verify` if you need to.
+Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint` before each commit and check the commit message format (see below); bypass them with `git commit --no-verify` if you need to.
 
 ### Type stubs
 
@@ -43,9 +43,10 @@ Run `just dev` after changing Rust code. The pre-commit hook runs `just fmt-chec
 
 ## Commits and pull requests
 
-- Use [Conventional Commits](https://www.conventionalcommits.org/): `feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`, `ci:`.
+- Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<optional scope>)<optional !>: <description>`, where type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
 - Pull requests are squash-merged, and the PR title becomes the commit message, so give PRs conventional titles too.
-- `main` is protected against force-pushes and deletion. PRs need the `ci-ok` check to pass; the maintainer can push to `main` directly.
+- Both are enforced by `scripts/check-commit-msg.sh`: locally by the `commit-msg` hook, and in CI by the `pr-title` check.
+- `main` is protected against force-pushes and deletion. PRs need the `ci-ok` and `pr-title` checks to pass; the maintainer can push to `main` directly.
 
 ## CI
 
@@ -54,7 +55,9 @@ Run `just dev` after changing Rust code. The pre-commit hook runs `just fmt-chec
 - **check**: `just check` and the stub check, on Python 3.12 and 3.14.
 - **wheels**: builds wheels for Linux (glibc and musl), macOS, and Windows across architectures, plus the sdist.
 - **test-wheels**: installs the built wheels and runs the tests on each platform that can run them natively.
-- **ci-ok**: a single job that passes only if all of the above passed; this is the required check.
+- **ci-ok**: a single job that passes only if all of the above passed; this is a required check.
+
+`.github/workflows/pr-title.yml` checks pull request titles (the other required check). It reruns when a title is edited, without rerunning the full CI.
 
 ## Dependencies
 
