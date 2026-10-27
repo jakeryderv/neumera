@@ -1,13 +1,12 @@
+[project]
+name = "neumera"
+requires-python = ">=3.12,<3.15"
+classifiers = [
+  "Programming Language :: Python :: Implementation :: CPython",
+  "Programming Language :: Rust",
+]
+dynamic = ["version"]
+
 [build-system]
 requires = ["maturin>=1.15,<2.0"]
 build-backend = "maturin"
-
-[project]
-name = "neumera"
-requires-python = ">=3.8"
-classifiers = [
-    "Programming Language :: Rust",
-    "Programming Language :: Python :: Implementation :: CPython",
-    "Programming Language :: Python :: Implementation :: PyPy",
-]
-dynamic = ["version"]
