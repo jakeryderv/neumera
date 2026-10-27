@@ -10,3 +10,10 @@ dynamic = ["version"]
 [build-system]
 requires = ["maturin>=1.15,<2.0"]
 build-backend = "maturin"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.3",
+    "ty>=0.0.92",
+]
