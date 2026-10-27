@@ -1,0 +1,51 @@
+# Publishes to PyPI via trusted publishing. PyPI's trusted publisher is
+# registered for this file name, so don't rename it without updating PyPI.
+name: Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify-tag:
+    name: Verify tag matches version
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Compare tag with Cargo.toml version
+        run: |
+          version=$(grep -m1 '^version' rust/Cargo.toml | cut -d'"' -f2)
+          if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match Cargo.toml version $version"
+            exit 1
+          fi
+
+  build:
+    needs: verify-tag
+    uses: ./.github/workflows/CI.yml
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/neumera
+    permissions:
+      # Used for trusted publishing and to sign attestations
+      id-token: write
+      # Used to generate artifact attestation
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@v7
+      - name: Generate artifact attestation
+        uses: actions/attest@v4
+        with:
+          subject-path: 'wheels-*/*'
+      - uses: astral-sh/setup-uv@v7
+      - name: Publish to PyPI
+        run: uv publish --trusted-publishing always 'wheels-*/*'
