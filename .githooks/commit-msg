@@ -1,4 +1,34 @@
 #!/bin/sh
 # Enabled by `just hooks`. Bypass with `git commit --no-verify`.
-# --no-sync: never rebuild the Rust extension in the middle of a commit.
-exec uv run --no-sync cz check --allow-abort --commit-msg-file "$1"
+# Validation is done by commitizen (`cz check`); this hook only adds guidance
+# when it fails. --no-sync: never rebuild the Rust extension mid-commit.
+output=$(uv run --no-sync cz check --allow-abort --commit-msg-file "$1" 2>&1) && exit 0
+
+case "$output" in
+*"validation: failed"*) ;;
+*)
+    # Not a message problem (e.g. commitizen missing): show the raw error
+    # shellcheck disable=SC2016  # backticks are literal
+    printf '%s\n\nhint: run `just setup` to install the dev tools\n' "$output" >&2
+    exit 1
+    ;;
+esac
+
+subject=$(grep -v '^#' "$1" | grep -m1 -v '^[[:space:]]*$')
+cat >&2 <<MSG
+error: commit message does not follow Conventional Commits:
+
+    $subject
+
+Expected:  <type>(<optional scope>)<optional !>: <description>
+Types:     feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+Examples:  feat: add gradient descent optimizer
+           fix(rust): handle empty input arrays
+           feat!: rename fit() to train()
+
+Your message was saved. To edit and retry it:
+    git commit -e -F $1
+Or write it with the interactive prompt:
+    just commit
+MSG
+exit 1

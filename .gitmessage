@@ -1,0 +1,10 @@
+
+# <type>(<optional scope>)<optional !>: <description>
+#
+# Types:     feat, fix, docs, style, refactor, perf, test, build, ci, chore, revert
+# Examples:  feat: add gradient descent optimizer
+#            fix(rust): handle empty input arrays
+#            feat!: rename fit() to train()
+#
+# Add an optional body after a blank line. Lines starting with # are ignored.
+# Prefer prompts? Abort (save an empty message) and run `just commit`.

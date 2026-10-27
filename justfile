@@ -15,9 +15,10 @@ sync:
 commit *args:
     uv run --no-sync cz commit {{args}}
 
-# Enable the repo's git hooks (pre-commit runs fmt-check and lint)
+# Enable the repo's git hooks and commit message template
 hooks:
     git config core.hooksPath .githooks
+    git config commit.template .gitmessage
 
 # Rebuild and reinstall the Rust extension, regenerating type stubs
 dev:
