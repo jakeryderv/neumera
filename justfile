@@ -8,9 +8,10 @@ default:
 sync:
     uv sync
 
-# Rebuild and reinstall the Rust extension
+# Rebuild and reinstall the Rust extension, regenerating type stubs
 dev:
-    uv sync --reinstall-package neumera
+    uv sync --no-install-project
+    uv run --no-sync maturin develop --uv --generate-stubs
 
 
 # --- Testing --------------------------------------------------
@@ -40,7 +41,7 @@ fmt:
     cargo fmt --manifest-path rust/Cargo.toml --all
 
 # Run all checks
-check: fmt-check lint test
+check: dev fmt-check lint test
 
 
 # --- Building -------------------------------------------------
