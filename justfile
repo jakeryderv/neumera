@@ -11,6 +11,10 @@ setup: hooks dev
 sync:
     uv sync
 
+# Write a commit interactively (extra args go to `cz commit`, e.g. --retry)
+commit *args:
+    uv run --no-sync cz commit {{args}}
+
 # Enable the repo's git hooks (pre-commit runs fmt-check and lint)
 hooks:
     git config core.hooksPath .githooks

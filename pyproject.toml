@@ -2,10 +2,10 @@
 name = "neumera"
 description = "Foundational implementations and utilities for machine learning, numerical computing, and optimization."
 readme = "README.md"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Jake Van Slyke" }]
-requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 1 - Planning",
   "Programming Language :: Python :: 3.12",
@@ -19,22 +19,27 @@ dynamic = ["version"]
 [project.urls]
 Repository = "https://github.com/jakeryderv/neumera"
 
+[dependency-groups]
+dev = [
+  "maturin>=1.15,<2.0",
+  "pytest>=9.1.1",
+  "ruff>=0.17.3",
+  "ty>=0.0.92",
+  { include-group = "commit" },
+]
+# Commit message tooling; separate so CI can install it alone
+commit = [
+  "commitizen>=4.19.3",
+]
+
 [build-system]
 requires = ["maturin>=1.15,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
 manifest-path = "rust/Cargo.toml"
-python-source = "src"
 module-name = "neumera._core"
-
-[dependency-groups]
-dev = [
-    "maturin>=1.15,<2.0",
-    "pytest>=9.1.1",
-    "ruff>=0.17.3",
-    "ty>=0.0.92",
-]
+python-source = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

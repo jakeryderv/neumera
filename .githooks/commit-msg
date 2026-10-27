@@ -1,3 +1,4 @@
 #!/bin/sh
 # Enabled by `just hooks`. Bypass with `git commit --no-verify`.
-exec scripts/check-commit-msg.sh "$1"
+# --no-sync: never rebuild the Rust extension in the middle of a commit.
+exec uv run --no-sync cz check --allow-abort --commit-msg-file "$1"

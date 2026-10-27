@@ -34,6 +34,7 @@ Run `just` to list all recipes.
 | `just fmt` | Format Python and Rust |
 | `just lint` | Lockfile check, ruff, ty, clippy |
 | `just check` | Everything CI's check job runs: build, format check, lint, tests |
+| `just commit` | Write a commit interactively (Conventional Commits prompt) |
 
 Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint` before each commit and check the commit message format (see below); bypass them with `git commit --no-verify` if you need to.
 
@@ -44,8 +45,9 @@ Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint`
 ## Commits and pull requests
 
 - Use [Conventional Commits](https://www.conventionalcommits.org/): `<type>(<optional scope>)<optional !>: <description>`, where type is one of `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
+- Write commits with `just commit` for an interactive prompt ([commitizen](https://commitizen-tools.github.io/commitizen/)), or with plain `git commit` as usual. If a `just commit` fails (for example, the pre-commit lint fails), fix the problem and run `just commit --retry` to reuse your answers.
 - Pull requests are squash-merged, and the PR title becomes the commit message, so give PRs conventional titles too.
-- Both are enforced by `scripts/check-commit-msg.sh`: locally by the `commit-msg` hook, and in CI by the `pr-title` check.
+- Both are enforced by `cz check`: locally by the `commit-msg` hook, and in CI by the `pr-title` check.
 - `main` is protected against force-pushes and deletion. PRs need the `ci-ok` and `pr-title` checks to pass; the maintainer can push to `main` directly.
 
 ## CI
