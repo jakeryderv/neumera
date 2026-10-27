@@ -1,15 +1,27 @@
-# Show available commands
+# --- General --------------------------------------------------
+
+# List available commands
 default:
     @just --list
 
-# Install/sync Python environment
+# Sync Python dependencies
 sync:
     uv sync
 
+# Rebuild and reinstall the Rust extension
+dev:
+    uv sync --reinstall-package neumera
+
+
+# --- Testing --------------------------------------------------
+
 # Run Python and Rust tests
-test:
+test: dev
     uv run pytest
     cargo test --manifest-path rust/Cargo.toml
+
+
+# --- Code quality ---------------------------------------------
 
 # Lint Python and Rust
 lint:
@@ -30,6 +42,9 @@ fmt:
 # Run all checks
 check: fmt-check lint test
 
-# Build Python distributions
+
+# --- Building -------------------------------------------------
+
+# Build Python source and wheel distributions
 build:
     uv build
