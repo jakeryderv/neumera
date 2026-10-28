@@ -1,13 +1,15 @@
-[package]
-name = "neumera"
+[workspace]
+resolver = "3"
+members = ["neumera-lean", "neumera-py"]
+
+# The version lives here only; `just release` rewrites it and publish.yml
+# reads it. Member crates inherit it via `version.workspace = true`.
+[workspace.package]
 version = "0.0.1"
 edition = "2024"
 license = "Apache-2.0"
+repository = "https://github.com/jakeryderv/neumera"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-[lib]
-name = "_core"
-crate-type = ["cdylib"]
-
-[dependencies]
+[workspace.dependencies]
+neumera-lean = { path = "neumera-lean" }
 pyo3 = { version = "0.30.1", features = ["experimental-inspect"] }

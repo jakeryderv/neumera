@@ -4,7 +4,7 @@ This is the canonical guide to developing and releasing neumera.
 
 ## Setup
 
-Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://just.systems/), and [rustup](https://rustup.rs/). The Rust toolchain version is pinned in `rust-toolchain.toml` and installed automatically by rustup; uv manages Python and all Python tooling.
+Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://just.systems/), [rustup](https://rustup.rs/), and [elan](https://github.com/leanprover/elan). The Rust toolchain version is pinned in `rust-toolchain.toml` and installed automatically by rustup; the Lean toolchain is pinned in `lean/lean-toolchain` and installed automatically by elan when Lake runs; uv manages Python and all Python tooling.
 
 ```sh
 git clone https://github.com/jakeryderv/neumera.git
@@ -18,8 +18,12 @@ just setup
 
 | Path | Contents |
 |---|---|
-| `rust/` | Rust crate (PyO3), compiled to the `neumera._core` extension module |
+| `lean/` | Lake package: Lean definitions, implementations, proofs, and the contract manifest emitter |
+| `rust/` | Cargo workspace; the version lives in its `Cargo.toml` |
+| `rust/neumera-lean/` | Lean integration crate: runtime connection, property-carrying wrappers, manifest consumer. No Python dependency. Name provisional |
+| `rust/neumera-py/` | PyO3 adapter over `neumera-lean`, compiled to the `neumera._core` extension module |
 | `src/neumera/` | Python package; re-exports the public API from `_core` |
+| `docs/` | Design documents; start with `bringing-mathematical-meaning-into-everyday-programming.md` |
 | `src/neumera/_core.pyi` | Type stubs, **generated** from the compiled extension |
 | `tests/` | Python tests (Rust unit tests live next to the Rust code) |
 
@@ -59,7 +63,7 @@ Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint`
 `.github/workflows/CI.yml` runs on pushes to `main` and on pull requests:
 
 - **check**: `just check` and the stub check, on Python 3.12 and 3.14.
-- **wheels**: builds wheels for Linux (glibc and musl), macOS, and Windows across architectures, plus the sdist.
+- **wheels**: builds wheels where Lean ships a prebuilt toolchain: x86-64 and aarch64 Linux (manylinux_2_28, since Lean needs glibc 2.26+), Apple Silicon macOS, plus the sdist. Intel macOS and x86-64 Windows are built best-effort and don't block `ci-ok`.
 - **test-wheels**: installs the built wheels and runs the tests on each platform that can run them natively.
 - **ci-ok**: a single job that passes only if all of the above passed; this is a required check.
 
@@ -67,7 +71,7 @@ Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint`
 
 ## Dependencies
 
-Dependabot opens weekly grouped PRs for GitHub Actions, Cargo, uv, and the Rust toolchain.
+Dependabot opens weekly grouped PRs for GitHub Actions, Cargo, uv, and the Rust toolchain. It has no support for elan or Lake, so the Lean toolchain pin in `lean/lean-toolchain` and any Lake dependencies are updated by hand.
 
 - GitHub Actions updates and minor/patch uv updates merge automatically once CI passes.
 - Cargo and Rust toolchain updates need a manual merge. A pyo3 bump can change the generated stubs: check out the PR, run `just dev`, and commit the updated `_core.pyi`.

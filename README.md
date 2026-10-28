@@ -16,7 +16,7 @@ Start with [the vision and prototype scope](docs/bringing-mathematical-meaning-i
 pip install neumera
 ```
 
-Prebuilt wheels are available for Linux, macOS, and Windows on Python 3.12 and newer.
+Prebuilt wheels target Python 3.12 and newer on x86-64 and aarch64 Linux (glibc 2.28+) and Apple Silicon macOS, the platforms where Lean ships a prebuilt toolchain. Intel macOS and x86-64 Windows wheels are built on a best-effort basis.
 
 ## Development
 

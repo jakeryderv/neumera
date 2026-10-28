@@ -1,0 +1,17 @@
+[package]
+name = "neumera-py"
+description = "Python adapter for neumera, built with PyO3 and maturin."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# Built into the Python wheel by maturin; never published to crates.io.
+publish = false
+
+[lib]
+name = "_core"
+crate-type = ["cdylib"]
+
+[dependencies]
+neumera-lean.workspace = true
+pyo3.workspace = true

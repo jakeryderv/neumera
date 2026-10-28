@@ -1,0 +1,11 @@
+[package]
+name = "neumera-lean"
+description = "Lean integration layer: calls compiled Lean code and preserves established properties on concrete data."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# Name is provisional and the crate has no API yet; not published until both settle.
+publish = false
+
+[dependencies]
