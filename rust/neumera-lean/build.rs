@@ -20,6 +20,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -85,18 +86,20 @@ fn main() {
     ] {
         println!("cargo:rerun-if-changed={}", p.display());
     }
-    for var in ["NEUMERA_LEAN_MANIFEST", "ELAN_TOOLCHAIN", "LEAN_SYSROOT"] {
-        println!("cargo:rerun-if-env-changed={var}");
-    }
+    println!("cargo:rerun-if-env-changed=NEUMERA_LEAN_MANIFEST");
 
-    // 1. Toolchain pin, and one toolchain for both Lake and the FFI bindings.
+    // 1. Toolchain pin: Lake and the FFI bindings must use the same Lean.
     //
-    // `lean-rs-sys` discovers Lean through `LEAN_SYSROOT` or a plain
-    // `lean --print-prefix` run from its own package directory, where this
-    // repository's `lean-toolchain` file is not visible to elan. The root
-    // `.cargo/config.toml` therefore sets `ELAN_TOOLCHAIN` for every process
-    // Cargo runs, and this script checks that it equals the pin, so Lake and
-    // the bindings cannot resolve different toolchains.
+    // Every Lake invocation below runs with `ELAN_TOOLCHAIN` set to the pin
+    // line, exactly as `neumera-lean-sys` resolves it, so the caller's
+    // environment and elan directory overrides cannot select another Lean for
+    // either side (Lake would otherwise read `lean/lean-toolchain`, a symlink
+    // to the repository root file, and honour overrides). `neumera-lean-sys` resolves the same file itself
+    // and publishes the prefix and version it used as `links` metadata, which
+    // Cargo passes to this script as `DEP_LEAN_*`; Cargo recompiles that crate
+    // whenever its build script reruns, so the values describe the bindings
+    // this build links. Comparing both with the pin and with each other
+    // catches a toolchain whose contents changed behind an unchanged path.
     let pinned_line = fs::read_to_string(&toolchain_file)
         .unwrap_or_else(|e| fail(format!("cannot read {}: {e}", toolchain_file.display())))
         .trim()
@@ -106,17 +109,7 @@ fn main() {
         .next()
         .map(|v| v.trim_start_matches('v').to_string())
         .unwrap_or_default();
-    match env::var("ELAN_TOOLCHAIN") {
-        Ok(v) if v.trim() == pinned_line => {}
-        Ok(v) => fail(format!(
-            "ELAN_TOOLCHAIN is {v:?} but {} pins {pinned_line:?}; the two must agree (see .cargo/config.toml)",
-            toolchain_file.display()
-        )),
-        Err(_) => fail(format!(
-            "ELAN_TOOLCHAIN is not set. Run cargo from inside the repository so .cargo/config.toml applies, \
-             or set ELAN_TOOLCHAIN={pinned_line}; it pins the toolchain for the `lean-rs-sys` build script too"
-        )),
-    }
+    PIN.set(pinned_line.clone()).expect("pin is set once");
     let lean_version_line = run(&lean_dir, "lake", &["env", "lean", "--version"]);
     let running_version = parse_lean_version(&lean_version_line);
     if running_version != pinned_version {
@@ -128,37 +121,22 @@ fn main() {
     let prefix_dir = canonical(&PathBuf::from(
         run(&lean_dir, "lake", &["env", "lean", "--print-prefix"]).trim(),
     ));
-    // The bindings must come from the same toolchain. `lean-rs-sys` (the
-    // project's fork) publishes the prefix and version it resolved as `links`
-    // metadata, which Cargo passes to this script as `DEP_LEANSHARED_*`; its
-    // build script reruns when `ELAN_TOOLCHAIN`, `LEAN_SYSROOT`, `ELAN_HOME`,
-    // `PATH`, or `lean.h` change, and Cargo recompiles the crate whenever that
-    // script reruns, so the values describe the bindings this build will link.
-    // This compares the bindings with Lake and with the pin; a toolchain whose
-    // contents changed behind an unchanged path is caught by the `lake env
-    // lean --version` check above.
-    let bindings_prefix = canonical(&PathBuf::from(
-        env::var_os("DEP_LEANSHARED_PREFIX").unwrap_or_else(|| {
-            fail(
-                "DEP_LEANSHARED_PREFIX is not set: `lean-rs-sys` did not publish its toolchain prefix \
-                 (is the dependency the project's fork?)"
-                    .to_string(),
-            )
-        }),
-    ));
+    let bindings_prefix = canonical(&PathBuf::from(env::var_os("DEP_LEAN_PREFIX").unwrap_or_else(|| {
+        fail("DEP_LEAN_PREFIX is not set: `neumera-lean-sys` did not publish its toolchain prefix".to_string())
+    })));
     if bindings_prefix != prefix_dir {
         fail(format!(
-            "`lean-rs-sys` resolved the Lean toolchain at {} but Lake uses {}; the FFI bindings and the Lean library \
-             must come from one toolchain. LEAN_SYSROOT or PATH probably points at a different Lean than the pin",
+            "`neumera-lean-sys` resolved the Lean toolchain at {} but Lake uses {}; the FFI bindings and the Lean \
+             library must come from one toolchain",
             bindings_prefix.display(),
             prefix_dir.display()
         ));
     }
     let bindings_version =
-        env::var("DEP_LEANSHARED_LEAN_VERSION").unwrap_or_else(|_| "<not published>".to_string());
+        env::var("DEP_LEAN_VERSION").unwrap_or_else(|_| "<not published>".to_string());
     if bindings_version != pinned_version {
         fail(format!(
-            "`lean-rs-sys` was built against Lean {bindings_version} but {} pins {pinned_version}",
+            "`neumera-lean-sys` was built against Lean {bindings_version} but {} pins {pinned_version}",
             toolchain_file.display()
         ));
     }
@@ -319,7 +297,7 @@ fn main() {
     let generated = render_contracts(&manifest, &prefix);
     fs::write(out_dir.join("contracts.rs"), generated).unwrap();
 
-    // 8. Link the static library. `lean-rs-sys` links the Lean runtime
+    // 8. Link the static library. `neumera-lean-sys` links the Lean runtime
     //    (`libleanshared`) and sets the rpath for its own targets; this crate's
     //    tests and examples need the rpath too.
     let lib_name = static_lib
@@ -544,6 +522,7 @@ fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration,
     };
     let mut child = Command::new(program)
         .args(args)
+        .env("ELAN_TOOLCHAIN", pin())
         .current_dir(dir)
         .stdout(Stdio::from(open(&stdout_path)))
         .stderr(Stdio::from(open(&stderr_path)))
@@ -589,9 +568,18 @@ fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration,
     }
 }
 
+/// The `lean-toolchain` pin line; every `lean`/`lake` child runs with
+/// `ELAN_TOOLCHAIN` set to it (see step 1 in `main`).
+static PIN: OnceLock<String> = OnceLock::new();
+
+fn pin() -> &'static str {
+    PIN.get().expect("pin is set before any Lake invocation")
+}
+
 fn run(dir: &Path, program: &str, args: &[&str]) -> String {
     let output = Command::new(program)
         .args(args)
+        .env("ELAN_TOOLCHAIN", pin())
         .current_dir(dir)
         .output()
         .unwrap_or_else(|e| {

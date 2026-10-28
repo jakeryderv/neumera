@@ -21,14 +21,14 @@ use std::fmt;
 use std::ptr::NonNull;
 use std::rc::Rc;
 
-use lean_rs_sys::array::{
+use neumera_lean_sys::array::{
     lean_alloc_array, lean_array_get_core, lean_array_set_core, lean_array_size,
 };
-use lean_rs_sys::nat_int::lean_int_big_le;
-use lean_rs_sys::object::lean_is_scalar;
-use lean_rs_sys::refcount::{lean_dec, lean_inc};
-use lean_rs_sys::scalar::{lean_int64_to_int, lean_scalar_to_int64};
-use lean_rs_sys::{b_lean_obj_arg, lean_obj_arg, lean_obj_res, lean_object};
+use neumera_lean_sys::nat_int::lean_int_big_le;
+use neumera_lean_sys::object::lean_is_scalar;
+use neumera_lean_sys::refcount::{lean_dec, lean_inc};
+use neumera_lean_sys::scalar::{lean_int64_to_int, lean_scalar_to_int64};
+use neumera_lean_sys::{b_lean_obj_arg, lean_obj_arg, lean_obj_res, lean_object};
 
 /// Contracts checked by Lean in the build that produced the linked library.
 ///
@@ -38,7 +38,7 @@ pub mod contracts {
 }
 
 /// Foreign declarations: the exports of the Lean library and the runtime
-/// functions that `lean-rs-sys` does not declare.
+/// functions that `neumera-lean-sys` does not declare.
 mod ffi {
     use super::{b_lean_obj_arg, lean_obj_arg, lean_obj_res};
 
@@ -93,11 +93,11 @@ pub mod runtime {
     use std::sync::OnceLock;
     use std::thread::{self, ThreadId};
 
-    use lean_rs_sys::init::{
+    use neumera_lean_sys::init::{
         lean_finalize_thread, lean_initialize_runtime_module, lean_initialize_thread,
     };
-    use lean_rs_sys::io::{lean_io_mark_end_initialization, lean_io_result_is_ok};
-    use lean_rs_sys::refcount::lean_dec;
+    use neumera_lean_sys::io::{lean_io_mark_end_initialization, lean_io_result_is_ok};
+    use neumera_lean_sys::refcount::lean_dec;
 
     use super::{Error, ffi};
 

@@ -20,6 +20,7 @@ just setup
 |---|---|
 | `lean/` | Lake package: Lean definitions and proofs (`Neumera/`), the contracts module (`Neumera/Contracts.lean`), and the manifest emitter (`Manifest.lean`) |
 | `rust/` | Cargo workspace; the version lives in its `Cargo.toml` |
+| `rust/neumera-lean-sys/` | Raw FFI bindings to the Lean C ABI, vendored from `lean-rs-sys` (see its `VENDORED.md`); checks the pinned toolchain's `lean.h` digest and links the Lean runtime |
 | `rust/neumera-lean/` | Lean integration crate: runs Lake and the manifest emitter from `build.rs`, validates build identity, generates `contracts`, links the Lean library. No Python dependency. Name provisional |
 | `rust/neumera-py/` | PyO3 adapter, compiled to the `neumera._core` extension module. Does not yet depend on `neumera-lean` |
 | `scripts/` | `contract_negative_tests.py`: mutations that must fail the Rust build |
@@ -67,7 +68,7 @@ To add a contract: prove the theorem in `lean/Neumera/`, restate it in `lean/Neu
 - Both are enforced by `cz check`: locally by the `commit-msg` hook, and in CI by the `pr-title` check.
 - `main` is protected against force-pushes and deletion. PRs need the `ci-ok` and `pr-title` checks to pass; the maintainer can push to `main` directly.
 - Work on a branch and open a draft PR as soon as you push it (`gh pr create --draft --fill`). CI runs on pull requests and on pushes to `main`, not on other branch pushes, so a branch without a PR gets no CI unless you dispatch it by hand (`gh workflow run CI.yml --ref <branch>`).
-- The PR template has a checklist. Changes to `rust/neumera-lean/build.rs`, `unsafe` code, `lean/Manifest.lean`, or the manifest format get an independent adversarial review before merge; record its findings in the PR.
+- The PR template has a checklist. Changes to `rust/neumera-lean-sys/`, `rust/neumera-lean/build.rs`, `unsafe` code, `lean/Manifest.lean`, or the manifest format get an independent adversarial review before merge; record its findings in the PR.
 - Merge with `gh pr merge --squash --delete-branch`. If another PR is stacked on the one being merged, retarget it to `main` first (`gh pr edit <n> --base main`): deleting the base branch closes a stacked PR, and a closed PR whose base is gone cannot be reopened. GitHub deletes the remote branch on merge; the flag also deletes your local branch and checks out `main`. Squash merges rewrite history, so `git branch -d` on a merged branch refuses with "not fully merged"; that flag or `git branch -D` is the answer. A plain `git fetch` prunes stale `origin/*` refs (`fetch.prune` is recommended globally); a fetch with an explicit branch argument prunes only that branch.
 
 ## CI
@@ -84,7 +85,7 @@ To add a contract: prove the theorem in `lean/Neumera/`, restate it in `lean/Neu
 
 ## Dependencies
 
-Dependabot opens weekly grouped PRs for GitHub Actions, Cargo, uv, and the Rust toolchain. The Lean binding crates (`lean-rs-sys`, `lean-rs-abi`) are pinned to a commit of the project's fork through `[patch.crates-io]` in `rust/Cargo.toml` and are updated by hand; see `docs/binding-layer-evaluation.md`. It has no support for elan or Lake, so the Lean toolchain pin in `lean-toolchain` and any Lake dependencies are updated by hand. Before bumping the Lean pin, check that `lean-rs-sys` supports the new version (see `docs/binding-layer-evaluation.md`), and update `ELAN_TOOLCHAIN` in `.cargo/config.toml` to the same value; the build fails if the two disagree. The bindings rebuild on their own after a pin change, and the build fails if `lean-rs-sys` and Lake resolved different toolchains. `NEUMERA_ALT_TOOLCHAIN=<installed toolchain> just negative-tests` exercises both.
+Dependabot opens weekly grouped PRs for GitHub Actions, Cargo, uv, and the Rust toolchain. It has no support for elan or Lake, so the Lean toolchain pin in `lean-toolchain` and any Lake dependencies are updated by hand. The Lean C-API bindings are vendored in `rust/neumera-lean-sys` and mirror parts of `lean.h`, so a Lean bump is a reviewed change: update the pin, re-check the mirrored helpers against the new header, and record the new digest in `rust/neumera-lean-sys/lean.h.sha256`; the build fails until the digest matches. The procedure is in `rust/neumera-lean-sys/VENDORED.md`. `NEUMERA_ALT_TOOLCHAIN=<installed toolchain> just negative-tests` exercises the gate.
 
 - GitHub Actions updates and minor/patch uv updates merge automatically once CI passes.
 - Cargo and Rust toolchain updates need a manual merge. A pyo3 bump can change the generated stubs: check out the PR, run `just dev`, and commit the updated `_core.pyi`.

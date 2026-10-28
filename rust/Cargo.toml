@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["neumera-lean", "neumera-py"]
+members = ["neumera-lean-sys", "neumera-lean", "neumera-py"]
 
 # The version lives here only; `just release` rewrites it and publish.yml
 # reads it. Member crates inherit it via `version.workspace = true`.
@@ -14,15 +14,7 @@ repository = "https://github.com/jakeryderv/neumera"
 neumera-lean = { path = "neumera-lean" }
 pyo3 = { version = "0.30.1", features = ["experimental-inspect"] }
 # Raw, version-checked bindings to the Lean 4 C ABI. See docs/binding-layer-evaluation.md.
-lean-rs-sys = "0.9.4"
+neumera-lean-sys = { path = "neumera-lean-sys" }
+sha2 = "0.11"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-
-# The Lean bindings come from the project's fork of jcreinhold/lean-rs, pinned
-# to a commit, so fixes this project needs can be carried without waiting on
-# upstream. The version requirement above stays as upstream numbers it; the
-# patch only changes where that version's source comes from. The pinned commit
-# and the fork's patches are recorded in docs/binding-layer-evaluation.md.
-[patch.crates-io]
-lean-rs-sys = { git = "https://github.com/jakeryderv/lean-rs", rev = "8ec5664865f256b5cd71aa36d88c6bec199a3a7e" }
-lean-rs-abi = { git = "https://github.com/jakeryderv/lean-rs", rev = "8ec5664865f256b5cd71aa36d88c6bec199a3a7e" }

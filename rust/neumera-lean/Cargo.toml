@@ -10,7 +10,7 @@ publish = false
 links = "neumera_Neumera"
 
 [dependencies]
-lean-rs-sys.workspace = true
+neumera-lean-sys.workspace = true
 
 [build-dependencies]
 serde.workspace = true
