@@ -35,6 +35,14 @@ The safe front door over `lean-rs-sys`, with a companion `lean-toolchain` build-
 
 About the same amount of code as what this crate writes on top of `lean-rs-sys`, plus reimplementations of the inline helpers (reference counting fast paths, boxing, array header layout, scalar range dispatch) and a header checksum guard of our own. The reimplementations are exactly the version-coupled part, and `lean-rs-sys` maintains them across a tested window with a checksum gate. With 4.35.0 supported there was no reason to carry that ourselves. Had the pin been unsupported, the comparison would have been between pinning a supported version (no code cost, one version behind) and writing roughly 150 lines of layout-dependent `unsafe` code; the former would still have been preferable unless a specific 4.35.0 feature were needed.
 
+## Source of the bindings
+
+The two crates are consumed from the project's fork, `jakeryderv/lean-rs`, through `[patch.crates-io]` in `rust/Cargo.toml`, pinned to a commit. The version requirement stays as upstream numbers it (`0.9.4`); the patch only redirects where that version's source comes from, so removing the fork later is deleting the patch section. Fixes this project needs are carried in the fork rather than submitted upstream, tagged `v<upstream version>+neumera.<n>` so they never collide with upstream's numbering.
+
+| Pinned commit | Fork tag | Patches relative to upstream |
+|---|---|---|
+| `d2dc03b4c53d6c811d5bef1fe6d481a110c374d1` | none (identical to upstream `v0.9.4`) | none |
+
 ## Consequences
 
 - The Lean runtime is linked dynamically from the toolchain's `lib/lean/libleanshared.so`. This crate's tests and examples carry an rpath to it. Any downstream crate that produces a binary or `cdylib` must emit its own rpath or bundle the library; the Python wheel will have to solve this, and that is out of scope for this slice.
