@@ -36,6 +36,13 @@ Cases (see docs/design-example-sorted-vectors.md, section 4):
      build, an .olean is tampered (the       (artifacts are build inputs)
      manifest is untouched).
 
+ 14. (opt-in) Switch the Lean pin to a      -> build fails naming stale
+     second installed toolchain without       lean-rs-sys bindings; passes
+     cleaning the target directory.           after `cargo clean -p lean-rs-sys`
+
+Case 14 runs only when NEUMERA_ALT_TOOLCHAIN names an installed toolchain that
+lean-rs-sys supports (for example `leanprover/lean4:v4.34.0`).
+
 Usage: python scripts/contract_negative_tests.py [--keep]
 Standard library only. Needs cargo, lake, and lean on PATH.
 """
@@ -307,26 +314,76 @@ def make_scratch() -> Path:
     return scratch
 
 
-def build(root: Path, extra_env: dict[str, str]) -> tuple[int, str, float]:
-    # Never inherit a manifest override from the caller; case 4 sets its own.
-    env = {k: v for k, v in os.environ.items() if k != "NEUMERA_LEAN_MANIFEST"}
+def cargo(
+    root: Path, args: list[str], extra_env: dict[str, str]
+) -> tuple[int, str, float]:
+    """Run cargo against the scratch workspace, from inside the scratch copy so
+    its own `.cargo/config.toml` (and so its ELAN_TOOLCHAIN) applies."""
+    # Never inherit a manifest override or toolchain override from the caller;
+    # cases set their own.
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("NEUMERA_LEAN_MANIFEST", "ELAN_TOOLCHAIN")
+    }
     env.update({"CARGO_TARGET_DIR": str(root / "target"), **extra_env})
     start = time.monotonic()
     proc = subprocess.run(
-        [
-            "cargo",
-            "build",
-            "--manifest-path",
-            str(root / "rust" / "Cargo.toml"),
-            "-p",
-            "neumera-lean",
-        ],
+        ["cargo", *args, "--manifest-path", str(root / "rust" / "Cargo.toml")],
+        cwd=root,
         env=env,
         capture_output=True,
         text=True,
         check=False,
     )
     return proc.returncode, proc.stdout + proc.stderr, time.monotonic() - start
+
+
+def build(root: Path, extra_env: dict[str, str]) -> tuple[int, str, float]:
+    return cargo(root, ["build", "-p", "neumera-lean"], extra_env)
+
+
+def set_pin(root: Path, toolchain: str) -> None:
+    """Point both copies of the pin at `toolchain`."""
+    (root / "lean-toolchain").write_text(toolchain + "\n")
+    config = root / ".cargo" / "config.toml"
+    lines = config.read_text().splitlines(keepends=True)
+    out = [
+        f'ELAN_TOOLCHAIN = "{toolchain}"\n' if ln.startswith("ELAN_TOOLCHAIN") else ln
+        for ln in lines
+    ]
+    config.write_text("".join(out))
+
+
+def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
+    """Case 14: switching the pin without cleaning must be caught, because the
+    lean-rs-sys build script does not rerun on a pin change and would leave
+    bindings for the previous toolchain in the target directory."""
+    original = (root / "lean-toolchain").read_text().strip()
+    total = 0.0
+    try:
+        set_pin(root, alt)
+        code, out, secs = build(root, {})
+        total += secs
+        expect = "lean-rs-sys was compiled against a different Lean version"
+        if code == 0 or expect not in out:
+            return False, "stale bindings were not detected:\n" + out, total
+        code, out, secs = cargo(root, ["clean", "-p", "lean-rs-sys"], {})
+        total += secs
+        if code != 0:
+            return False, "cargo clean -p lean-rs-sys failed:\n" + out, total
+        code, out, secs = build(root, {})
+        total += secs
+        if code != 0:
+            return (
+                False,
+                f"build under {alt} failed after cleaning the bindings:\n" + out,
+                total,
+            )
+        return True, out, total
+    finally:
+        set_pin(root, original)
+        cargo(root, ["clean", "-p", "lean-rs-sys"], {})
 
 
 def main(argv: list[str]) -> int:
@@ -378,14 +435,28 @@ def main(argv: list[str]) -> int:
         for p, text in pristine.items():
             (scratch / p).write_text(text)
 
-    for number, title, fn in (
+    multi_step: list[tuple[int, str, Callable[[Path], tuple[bool, str, float]]]] = [
         (10, "edit supplied manifest in place", case_override_rerun),
         (
             13,
             "tamper an .olean after a valid build",
             case_artifact_tampered_after_build,
         ),
-    ):
+    ]
+    alt = os.environ.get("NEUMERA_ALT_TOOLCHAIN")
+    if alt:
+        multi_step.append(
+            (
+                14,
+                f"switch pin to {alt} without cleaning",
+                lambda root: case_toolchain_switch(root, alt),
+            )
+        )
+    else:
+        print(
+            "case 14   : skipped (set NEUMERA_ALT_TOOLCHAIN to a second installed toolchain)"
+        )
+    for number, title, fn in multi_step:
         ok, out, secs = fn(scratch)
         verdict = "ok" if ok else "FAILED"
         print(f"case {number:<2}   : {verdict} {title} ({secs:.1f}s)")

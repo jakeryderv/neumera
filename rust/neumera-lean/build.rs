@@ -193,6 +193,7 @@ fn main() {
             &toolchain_file.to_string_lossy(),
         ],
         EMITTER_TIMEOUT,
+        &out_dir,
     );
     let fresh = read_manifest(&fresh_path);
     validate_identity(
@@ -508,12 +509,20 @@ fn parse_lean_version(line: &str) -> String {
 /// Like [`run`], but kills the process and fails if it has not finished in
 /// time. Lean's module loader has been observed to hang on a corrupted
 /// `.olean`; a hang must become a build failure, not a stuck CI job.
-fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration) {
+///
+/// Output goes to files, not pipes: a child that fills a pipe blocks on write
+/// and would look exactly like a hang until the timeout.
+fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration, log_dir: &Path) {
+    let stdout_path = log_dir.join("emitter.stdout");
+    let stderr_path = log_dir.join("emitter.stderr");
+    let open = |p: &Path| {
+        fs::File::create(p).unwrap_or_else(|e| fail(format!("cannot create {}: {e}", p.display())))
+    };
     let mut child = Command::new(program)
         .args(args)
         .current_dir(dir)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(Stdio::from(open(&stdout_path)))
+        .stderr(Stdio::from(open(&stderr_path)))
         .spawn()
         .unwrap_or_else(|e| {
             fail(format!(
@@ -523,36 +532,36 @@ fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration)
             ))
         });
     let started = Instant::now();
-    loop {
+    let status = loop {
         match child.try_wait() {
-            Ok(Some(status)) => {
-                let output = child.wait_with_output().unwrap();
-                if !status.success() {
-                    fail(format!(
-                        "`{program} {}` in {} failed ({status}):\n--- stdout ---\n{}\n--- stderr ---\n{}",
-                        args.join(" "),
-                        dir.display(),
-                        String::from_utf8_lossy(&output.stdout),
-                        String::from_utf8_lossy(&output.stderr)
-                    ));
-                }
-                return;
-            }
+            Ok(Some(status)) => break status,
             Ok(None) if started.elapsed() > timeout => {
                 let _ = child.kill();
                 let _ = child.wait();
                 fail(format!(
                     "`{program} {}` in {} did not finish within {}s and was killed. \
-                     If the Lean build directory may be corrupt, run `lake clean` in {} and rebuild.",
+                     If the Lean build directory may be corrupt, run `lake clean` in {} and rebuild. \
+                     Partial output: {} and {}",
                     args.join(" "),
                     dir.display(),
                     timeout.as_secs(),
-                    dir.display()
+                    dir.display(),
+                    stdout_path.display(),
+                    stderr_path.display()
                 ));
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(50)),
             Err(e) => fail(format!("waiting for `{program}`: {e}")),
         }
+    };
+    if !status.success() {
+        fail(format!(
+            "`{program} {}` in {} failed ({status}):\n--- stdout ---\n{}\n--- stderr ---\n{}",
+            args.join(" "),
+            dir.display(),
+            fs::read_to_string(&stdout_path).unwrap_or_default(),
+            fs::read_to_string(&stderr_path).unwrap_or_default()
+        ));
     }
 }
 

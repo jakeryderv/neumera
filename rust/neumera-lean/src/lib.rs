@@ -37,6 +37,19 @@ pub mod contracts {
     include!(concat!(env!("OUT_DIR"), "/contracts.rs"));
 }
 
+// The bindings must have been compiled against the same Lean that built the
+// linked library. `lean-rs-sys` records the version of the `lean.h` it used at
+// its own build time, and its build script does not rerun when this
+// repository's toolchain pin changes, so a reused target directory can hold
+// bindings for the previous toolchain. The build script checks the toolchain
+// it sees; this checks the toolchain the bindings were actually built with.
+const _: () = assert!(
+    str_eq(lean_rs_sys::consts::LEAN_VERSION, contracts::LEAN_VERSION),
+    "lean-rs-sys was compiled against a different Lean version than the one that built the Lean library \
+     (stale bindings in the target directory after a toolchain change). \
+     Run `cargo clean -p lean-rs-sys` and rebuild."
+);
+
 /// Foreign declarations: the exports of the Lean library and the runtime
 /// functions that `lean-rs-sys` does not declare.
 mod ffi {
