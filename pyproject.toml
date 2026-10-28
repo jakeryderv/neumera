@@ -1,6 +1,6 @@
 [project]
 name = "neumera"
-description = "Foundational implementations and utilities for machine learning, numerical computing, and optimization."
+description = "Lean-checked mathematical guarantees carried through Rust and Python programs."
 readme = "README.md"
 requires-python = ">=3.12"
 license = "Apache-2.0"

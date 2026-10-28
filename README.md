@@ -4,7 +4,9 @@
 [![PyPI](https://img.shields.io/pypi/v/neumera)](https://pypi.org/project/neumera/)
 [![Python versions](https://img.shields.io/pypi/pyversions/neumera)](https://pypi.org/project/neumera/)
 
-Neumera is a Python library for exploring machine learning, numerical computing, and optimization through foundational implementations and practical utilities. It combines Python and Rust to support experimentation, learning, and high-performance computation.
+Neumera brings mathematical meaning into everyday programming. Definitions and theorems are written and checked in Lean, a Rust integration layer preserves the established properties on concrete data, and a Python adapter exposes the same objects and operations. The aim is that guarantees proved once can be carried through ordinary programs and used to discharge requirements, with the trusted code small enough to enumerate.
+
+Start with [the vision and prototype scope](docs/bringing-mathematical-meaning-into-everyday-programming.md), then [the worked design example](docs/design-example-sorted-vectors.md). [Project direction](docs/project-direction.md) records where the repository started and why it changed.
 
 > **Status:** early development. There is no usable API yet, and everything is subject to change.
 
