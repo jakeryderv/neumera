@@ -36,13 +36,16 @@ Cases (see docs/design-example-sorted-vectors.md, section 4):
      build, an .olean is tampered (the       (artifacts are build inputs)
      manifest is untouched).
 
- 14. (opt-in) Switch the Lean pin to a      -> lean-rs-sys is rebuilt and the
-     second installed toolchain without       build passes; then LEAN_SYSROOT
-     cleaning the target directory.           pointing the bindings at another
-                                              Lean than Lake's fails the build
+ 14. Corrupt the recorded lean.h digest     -> neumera-lean-sys fails naming the
+     (rust/neumera-lean-sys/lean.h.sha256).    digest mismatch
 
-Case 14 runs only when NEUMERA_ALT_TOOLCHAIN names an installed toolchain that
-lean-rs-sys supports (for example `leanprover/lean4:v4.34.0`).
+ 15. (opt-in) Switch the Lean pin to a      -> build fails on the digest gate;
+     second installed toolchain without       after recording that toolchain's
+     cleaning the target directory.           lean.h digest the bindings rebuild
+                                              and the build passes
+
+Case 15 runs only when NEUMERA_ALT_TOOLCHAIN names a second installed toolchain
+(for example `leanprover/lean4:v4.34.0`).
 
 Usage: python scripts/contract_negative_tests.py [--keep]
 Standard library only. Needs cargo, lake, and lean on PATH.
@@ -50,6 +53,7 @@ Standard library only. Needs cargo, lake, and lean on PATH.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -178,6 +182,13 @@ def case_sorry(root: Path, env: dict[str, str]) -> None:
     replace_in(root / BASIC, "  simp [concat]", "  sorry")
 
 
+DIGEST_FILE = Path("rust") / "neumera-lean-sys" / "lean.h.sha256"
+
+
+def case_corrupt_digest(root: Path, _env: dict[str, str]) -> None:
+    (root / DIGEST_FILE).write_text("0" * 64 + "\n")
+
+
 CASES = [
     Case(
         1, "delete the underlying theorem", case_delete_theorem, "Neumera.concat_length"
@@ -244,6 +255,12 @@ CASES = [
         "records contracts that differ from this build's",
         fresh_manifest=True,
     ),
+    Case(
+        14,
+        "corrupt the recorded lean.h digest",
+        case_corrupt_digest,
+        "has SHA-256",
+    ),
 ]
 
 
@@ -298,15 +315,15 @@ def make_scratch() -> Path:
     scratch = Path(tempfile.mkdtemp(prefix="neumera-negative-"))
     copy_tree(REPO / "lean", scratch / "lean")
     shutil.copy2(REPO / "lean-toolchain", scratch / "lean-toolchain")
-    copy_tree(REPO / ".cargo", scratch / ".cargo")
     (scratch / "rust").mkdir()
     for f in ("Cargo.toml", "Cargo.lock"):
         shutil.copy2(REPO / "rust" / f, scratch / "rust" / f)
-    copy_tree(
-        REPO / "rust" / "neumera-lean",
-        scratch / "rust" / "neumera-lean",
-        ignore=("target",),
-    )
+    for crate in ("neumera-lean-sys", "neumera-lean"):
+        copy_tree(
+            REPO / "rust" / crate,
+            scratch / "rust" / crate,
+            ignore=("target",),
+        )
     copy_tree(
         REPO / "rust" / "neumera-py",
         scratch / "rust" / "neumera-py",
@@ -318,11 +335,10 @@ def make_scratch() -> Path:
 def cargo(
     root: Path, args: list[str], extra_env: dict[str, str]
 ) -> tuple[int, str, float]:
-    """Run cargo against the scratch workspace, from inside the scratch copy so
-    its own `.cargo/config.toml` (and so its ELAN_TOOLCHAIN) applies."""
+    """Run cargo against the scratch workspace."""
     # Never inherit a manifest override or toolchain override from the caller;
-    # cases set their own. Case 14 reads cargo's "Compiling" lines, which
-    # `CARGO_TERM_QUIET` would suppress.
+    # the scratch copy's own pin must decide. Case 15 reads cargo's "Compiling"
+    # lines, which `CARGO_TERM_QUIET` would suppress.
     env = {
         k: v
         for k, v in os.environ.items()
@@ -346,44 +362,31 @@ def build(root: Path, extra_env: dict[str, str]) -> tuple[int, str, float]:
 
 
 def set_pin(root: Path, toolchain: str) -> None:
-    """Point both copies of the pin at `toolchain`."""
     (root / "lean-toolchain").write_text(toolchain + "\n")
-    config = root / ".cargo" / "config.toml"
-    lines = config.read_text().splitlines(keepends=True)
-    out = [
-        f'ELAN_TOOLCHAIN = "{toolchain}"\n' if ln.startswith("ELAN_TOOLCHAIN") else ln
-        for ln in lines
-    ]
-    config.write_text("".join(out))
 
 
 def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
-    """Case 14: one toolchain for the bindings and the Lean library.
+    """Case 15: the digest gate and the pin, end to end.
 
-    (a) Changing the pin must rebuild the `lean-rs-sys` bindings without a
-        manual `cargo clean`; the fork's build script reruns on
-        `ELAN_TOOLCHAIN`. The build under the new pin must pass.
-    (b) Pointing the bindings at a different Lean than Lake (here through
-        `LEAN_SYSROOT`, which Lake ignores) must fail with the prefix check."""
-    original = (root / "lean-toolchain").read_text().strip()
+    (a) Changing the pin alone must fail: the alternate toolchain's lean.h has
+        a different digest from the recorded one, and the bindings mirror the
+        header, so the build must stop until the digest is deliberately updated.
+    (b) Recording the alternate toolchain's digest must make the build pass,
+        with `neumera-lean-sys` rebuilt and no manual `cargo clean`."""
+    original_pin = (root / "lean-toolchain").read_text()
+    original_digest = (root / DIGEST_FILE).read_text()
     total = 0.0
     try:
         set_pin(root, alt)
         code, out, secs = build(root, {})
         total += secs
-        if code != 0:
-            return False, f"build under {alt} failed after a pin change:\n" + out, total
-        if "Compiling lean-rs-sys" not in out:
+        expect = "has SHA-256"
+        if code == 0 or expect not in out:
             return (
                 False,
-                "lean-rs-sys was not rebuilt after the pin change:\n" + out,
+                "pin change was not stopped by the digest gate:\n" + out,
                 total,
             )
-        set_pin(root, original)
-        code, out, secs = build(root, {})
-        total += secs
-        if code != 0:
-            return False, "build failed after restoring the pin:\n" + out, total
         probe = subprocess.run(
             ["lean", "--print-prefix"],
             env={**os.environ, "ELAN_TOOLCHAIN": alt},
@@ -393,26 +396,35 @@ def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
         )
         if probe.returncode != 0:
             return False, f"cannot resolve {alt}:\n" + probe.stderr, total
-        alt_prefix = probe.stdout.strip()
-        code, out, secs = build(root, {"LEAN_SYSROOT": alt_prefix})
+        header = Path(probe.stdout.strip()) / "include" / "lean" / "lean.h"
+        (root / DIGEST_FILE).write_text(
+            hashlib.sha256(header.read_bytes()).hexdigest() + "\n"
+        )
+        code, out, secs = build(root, {})
         total += secs
-        expect = "must come from one toolchain"
-        if code == 0 or expect not in out:
+        if code != 0:
             return (
                 False,
-                "a bindings/Lake toolchain mismatch was not detected:\n" + out,
+                f"build under {alt} failed with its digest recorded:\n" + out,
+                total,
+            )
+        if "Compiling neumera-lean-sys" not in out:
+            return (
+                False,
+                "neumera-lean-sys was not rebuilt after the pin change:\n" + out,
                 total,
             )
         return True, out, total
     finally:
-        set_pin(root, original)
+        (root / "lean-toolchain").write_text(original_pin)
+        (root / DIGEST_FILE).write_text(original_digest)
 
 
 def main(argv: list[str]) -> int:
     keep = "--keep" in argv
     scratch = make_scratch()
     print(f"scratch copy: {scratch}")
-    pristine = {p: (scratch / p).read_text() for p in (BASIC, CONTRACTS)}
+    pristine = {p: (scratch / p).read_text() for p in (BASIC, CONTRACTS, DIGEST_FILE)}
     failures = 0
 
     code, out, secs = build(scratch, {})
@@ -469,14 +481,14 @@ def main(argv: list[str]) -> int:
     if alt:
         multi_step.append(
             (
-                14,
+                15,
                 f"switch pin to {alt} without cleaning",
                 lambda root: case_toolchain_switch(root, alt),
             )
         )
     else:
         print(
-            "case 14   : skipped (set NEUMERA_ALT_TOOLCHAIN to a second installed toolchain)"
+            "case 15   : skipped (set NEUMERA_ALT_TOOLCHAIN to a second installed toolchain)"
         )
     for number, title, fn in multi_step:
         ok, out, secs = fn(scratch)

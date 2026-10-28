@@ -1,0 +1,26 @@
+[package]
+name = "neumera-lean-sys"
+description = "Raw FFI bindings for the Lean 4 C ABI, pinned to the repository's Lean toolchain. Vendored from lean-rs-sys; see VENDORED.md."
+version.workspace = true
+edition.workspace = true
+# Vendored code keeps its upstream licence terms (MIT OR Apache-2.0); see LICENSE-MIT and LICENSE-APACHE here.
+license = "MIT OR Apache-2.0"
+repository.workspace = true
+publish = false
+links = "lean"
+
+[features]
+# `dynamic` links `libleanshared`; `static` links the toolchain's static archives.
+# Exactly one must be enabled. The static link set is being reshaped for the
+# runtime-only case; see docs/static-linking-spike.md.
+default = ["dynamic"]
+dynamic = []
+static = []
+
+[dependencies]
+
+[build-dependencies]
+sha2.workspace = true
+
+[lib]
+doctest = false

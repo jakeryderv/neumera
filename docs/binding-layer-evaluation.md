@@ -6,6 +6,8 @@ Decision record for how the Rust integration crate reaches the Lean runtime. Wri
 
 Use **`lean-rs-sys`** (version 0.9.4), the raw bindings crate, with its default dynamic link against `libleanshared`. Do not use its safe companion `lean-rs`. Write the ownership layer, wrapper types, and build orchestration in this repository.
 
+**Update 2026-10-28:** the crate is now vendored as `rust/neumera-lean-sys` (see *Source of the bindings*). The evaluation below is kept as the record of why this binding was chosen over the alternatives.
+
 ## What was evaluated
 
 Three options, assessed on runtime initialization, ownership, conversions, error handling, build integration, and version coupling.
@@ -20,7 +22,7 @@ Raw FFI bindings for the Lean 4 C ABI, by Jacob Reinhold. Published 2026-10-13, 
 - **Ownership.** Helpers only (`lean_inc`, `lean_dec`). The owned-argument convention for `@[export]` functions is this crate's policy: retain before each call, release on drop, confirmed against the 4.35.0 FFI reference, which states that `@[export]` parameters are always owned.
 - **Conversions.** `lean_int64_to_int` dispatches between inline scalars and heap big integers; `lean_scalar_to_int64` reads scalars. It does not declare `lean_int64_of_big_int`, so this crate declares that one function itself and range-checks with `lean_int_big_le` before decoding. Array construction uses `lean_alloc_array` and `lean_array_set_core`.
 - **Error handling.** None beyond IO result predicates; appropriate for a sys crate.
-- **Build integration.** Discovers Lean via `lean --print-prefix` (or `LEAN_SYSROOT`) and emits link directives: by default `-lleanshared` plus an rpath for its own targets. A `static` feature exists but links `libLean` and `libLake` as well, which this project does not need. The elan proxy resolves the toolchain from the working directory, so the pin lives at the repository root as `lean-toolchain`, with `lean/lean-toolchain` a symlink to it, and every `lean` or `lake` invocation inside the tree resolves the same version. The `lean-rs-sys` build script runs outside the tree (in Cargo's git checkout), which is why `.cargo/config.toml` also sets `ELAN_TOOLCHAIN`; see Consequences.
+- **Build integration.** Discovers Lean via `lean --print-prefix` (or `LEAN_SYSROOT`) and emits link directives: by default `-lleanshared` plus an rpath for its own targets. A `static` feature exists but links `libLean` and `libLake` as well, which this project does not need. The elan proxy resolves the toolchain from the working directory, so the pin lives at the repository root as `lean-toolchain`, with `lean/lean-toolchain` a symlink to it, and every `lean` or `lake` invocation inside the tree resolves the same version. As a registry or git dependency the `lean-rs-sys` build script ran outside the tree, which required the pin to be repeated in `.cargo/config.toml`; vendoring removed that (see *Source of the bindings*).
 - **Cost.** One dependency plus `lean-rs-abi` (metadata) and `sha2` (build-time). A few seconds of compile time on a cold target directory, nothing warm.
 
 ### 2. `lean-rs` 0.9.4 (not chosen)
@@ -37,16 +39,16 @@ About the same amount of code as what this crate writes on top of `lean-rs-sys`,
 
 ## Source of the bindings
 
-The two crates are consumed from the project's fork, `jakeryderv/lean-rs`, through `[patch.crates-io]` in `rust/Cargo.toml`, pinned to a commit. The version requirement stays as upstream numbers it (`0.9.4`); the patch only redirects where that version's source comes from, so removing the fork later is deleting the patch section. Fixes this project needs are carried in the fork rather than submitted upstream, tagged `v<upstream version>+neumera.<n>` so they never collide with upstream's numbering.
+The bindings are vendored as the workspace crate `rust/neumera-lean-sys`: `lean-rs-sys` 0.9.4 and its `lean-rs-abi` metadata crate, taken at commit `8ec5664` of the project's fork `jakeryderv/lean-rs` (upstream `d2dc03b` plus one fork patch) on 2026-10-28, under their MIT or Apache-2.0 licence. The crate's `VENDORED.md` records provenance, what was changed, and the Lean bump procedure.
 
-| Pinned commit | Fork tag | Patches relative to upstream |
-|---|---|---|
-| `8ec5664865f256b5cd71aa36d88c6bec199a3a7e` | `v0.9.4+neumera.1` | `lean-rs-sys` build script: `ELAN_TOOLCHAIN` is a rerun input; resolved prefix, Lean version, and `lean.h` digest emitted as `cargo:` metadata for dependents |
+Why vendored rather than depended on: the project intends to shape this layer (a runtime-only static link mode next, see `static-linking-spike.md`), the sys crate can read the repository's pin directly only when it lives in the tree, and the upstream project is a single-author monorepo whose other six crates this project does not use. The fork repository is kept as a reference for comparing with upstream and is no longer a dependency.
+
+Changes from upstream in the vendored copy: a single pinned Lean version with a recorded `lean.h` digest replaces the supported-version window; toolchain discovery runs `lean --print-prefix` with `ELAN_TOOLCHAIN` set to the pin, so the pin lives in one file; `links = "lean"` publishes the resolved prefix and version to `neumera-lean`'s build script as `DEP_LEAN_PREFIX` and `DEP_LEAN_VERSION`.
 
 ## Consequences
 
 See `static-linking-spike.md` for the measurement that settles the distribution question: the runtime (`leanrt` + `Init` + the toolchain's static `gmp`, `uv`, `c++`) links statically into a binary with no Lean dependency at run time.
 
 - The Lean runtime is linked dynamically from the toolchain's `lib/lean/libleanshared.so`. This crate's tests and examples carry an rpath to it. Any downstream crate that produces a binary or `cdylib` must emit its own rpath or bundle the library; the Python wheel will have to solve this, and that is out of scope for this slice.
-- `lean-rs-sys` must support each Lean version this project pins. Bumping the pin means checking its supported window first.
-- Two toolchains pinned at the repository root: `rust-toolchain.toml` and `lean-toolchain`. The Lean pin is repeated as `ELAN_TOOLCHAIN` in `.cargo/config.toml`, because `lean-rs-sys` runs `lean --print-prefix` from its own package directory where the pin file is not visible; the `neumera-lean` build script fails if the two values differ. The fork's `lean-rs-sys` reruns its build script when `ELAN_TOOLCHAIN` changes and publishes the prefix and version it resolved as `links` metadata (`DEP_LEANSHARED_PREFIX`, `DEP_LEANSHARED_LEAN_VERSION`); the `neumera-lean` build script compares them with Lake's and fails if the bindings and the Lean library would come from different toolchains.
+- A Lean bump is a reviewed change to the vendored bindings: the mirrored inline helpers must be re-checked against the new `lean.h` before its digest is recorded in `rust/neumera-lean-sys/lean.h.sha256`.
+- Two toolchains pinned at the repository root: `rust-toolchain.toml` and `lean-toolchain`. `neumera-lean-sys` resolves the Lean pin itself and publishes the prefix and version it used as `links` metadata; the `neumera-lean` build script compares them with Lake's and with the pin, and fails if the bindings and the Lean library would come from different toolchains.
