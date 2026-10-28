@@ -35,7 +35,8 @@ test: dev
 
 # Build and test the Lean crate with the runtime linked statically (Linux only)
 test-static:
-    cargo test --manifest-path rust/Cargo.toml -p neumera-lean --no-default-features --features static
+    cargo clippy --manifest-path rust/Cargo.toml -p neumera-lean -p neumera-lean-sys --all-targets --no-default-features --features neumera-lean/static -- -D warnings
+    cargo test --manifest-path rust/Cargo.toml -p neumera-lean -p neumera-lean-sys --no-default-features --features neumera-lean/static
 
 # Contract manifest negative tests: each mutation must fail the Rust build
 negative-tests:

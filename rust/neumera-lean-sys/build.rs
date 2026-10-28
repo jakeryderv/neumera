@@ -37,7 +37,8 @@ fn main() {
     let static_link = env::var_os("CARGO_FEATURE_STATIC").is_some();
     if dynamic == static_link {
         panic!(
-            "neumera-lean-sys: exactly one of the features `dynamic` and `static` must be enabled"
+            "neumera-lean-sys: exactly one of the features `dynamic` and `static` must be enabled \
+             (`dynamic` is a default feature: pass --no-default-features with --features static)"
         );
     }
 

@@ -1,6 +1,7 @@
+/// Symbols every link mode must provide: the runtime surface this crate
+/// declares, defined in `leanrt` and `Init` (and so also in `libleanshared`).
 pub const REQUIRED_SYMBOLS: &[&str] = &[
     // init / runtime
-    "lean_initialize",
     "lean_initialize_runtime_module",
     "lean_initialize_thread",
     "lean_finalize_thread",
@@ -99,3 +100,7 @@ pub const REQUIRED_SYMBOLS: &[&str] = &[
     // external
     "lean_register_external_class",
 ];
+
+/// Symbols only `libleanshared` provides (defined in `libleancpp`, the
+/// compiler). Declared under the `dynamic` feature only.
+pub const COMPILER_SYMBOLS: &[&str] = &["lean_initialize"];

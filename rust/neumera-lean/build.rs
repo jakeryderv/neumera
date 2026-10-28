@@ -315,6 +315,11 @@ fn main() {
         });
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static={lib_name}");
+    // For tests/static_link.rs: the toolchain whose libraries must not appear.
+    println!(
+        "cargo:rustc-env=NEUMERA_LEAN_TOOLCHAIN_PREFIX={}",
+        prefix_dir.display()
+    );
     match env::var("DEP_LEAN_LINK_MODE").as_deref() {
         Ok("dynamic") => {
             // Applies to every binary this package links. Downstream crates

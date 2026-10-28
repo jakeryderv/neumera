@@ -1,22 +1,30 @@
 //! Runtime initialization and thread attachment.
 //!
-//! These symbols are exported by `libleanshared` but **not declared in
+//! These symbols are defined by the Lean runtime but **not declared in
 //! `lean.h`** (they are part of Lean's runtime entry-point surface, not the
 //! object-ABI header). The `LEAN_HEADER_DIGEST` build check therefore does
 //! not gate them; instead they are protected by `REQUIRED_SYMBOLS` plus
 //! `tests/linkage.rs`, which fails to link if any are missing.
+//!
+//! [`lean_initialize`] is the exception: it initializes the compiler as well
+//! as the runtime and lives in `libleancpp`, which only `libleanshared` links.
+//! It exists under the `dynamic` feature only; the `static` feature links the
+//! runtime alone, and programs that only call compiled Lean code use
+//! [`lean_initialize_runtime_module`].
 
 use core::ffi::c_char;
 
 unsafe extern "C" {
-    /// Initialize the Lean runtime. Must be called exactly once per process
-    /// before any other Lean-runtime entry point. The C signature in the
-    /// runtime accepts no arguments.
+    /// Initialize the Lean runtime **and the compiler**. Must be called at most
+    /// once per process. Defined in `libleancpp`, hence `dynamic` only; see the
+    /// module docs.
+    #[cfg(feature = "dynamic")]
     pub fn lean_initialize();
 
     /// Initialize the runtime module (compact regions, persistent objects).
-    /// Must be called after [`lean_initialize`] and before invoking any
-    /// compiled Lean module's `init` entry point.
+    /// Must be called once per process before invoking any compiled Lean
+    /// module's `init` entry point; the full `lean_initialize` is not needed
+    /// to run compiled code.
     pub fn lean_initialize_runtime_module();
 
     /// Attach the current OS thread to the Lean runtime so it may invoke
