@@ -321,11 +321,12 @@ def cargo(
     """Run cargo against the scratch workspace, from inside the scratch copy so
     its own `.cargo/config.toml` (and so its ELAN_TOOLCHAIN) applies."""
     # Never inherit a manifest override or toolchain override from the caller;
-    # cases set their own.
+    # cases set their own. Case 14 reads cargo's "Compiling" lines, which
+    # `CARGO_TERM_QUIET` would suppress.
     env = {
         k: v
         for k, v in os.environ.items()
-        if k not in ("NEUMERA_LEAN_MANIFEST", "ELAN_TOOLCHAIN")
+        if k not in ("NEUMERA_LEAN_MANIFEST", "ELAN_TOOLCHAIN", "CARGO_TERM_QUIET")
     }
     env.update({"CARGO_TARGET_DIR": str(root / "target"), **extra_env})
     start = time.monotonic()
@@ -383,13 +384,16 @@ def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
         total += secs
         if code != 0:
             return False, "build failed after restoring the pin:\n" + out, total
-        alt_prefix = subprocess.run(
+        probe = subprocess.run(
             ["lean", "--print-prefix"],
             env={**os.environ, "ELAN_TOOLCHAIN": alt},
             capture_output=True,
             text=True,
-            check=True,
-        ).stdout.strip()
+            check=False,
+        )
+        if probe.returncode != 0:
+            return False, f"cannot resolve {alt}:\n" + probe.stderr, total
+        alt_prefix = probe.stdout.strip()
         code, out, secs = build(root, {"LEAN_SYSROOT": alt_prefix})
         total += secs
         expect = "must come from one toolchain"

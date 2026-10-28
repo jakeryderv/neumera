@@ -131,8 +131,12 @@ fn main() {
     // The bindings must come from the same toolchain. `lean-rs-sys` (the
     // project's fork) publishes the prefix and version it resolved as `links`
     // metadata, which Cargo passes to this script as `DEP_LEANSHARED_*`; its
-    // build script reruns when `ELAN_TOOLCHAIN`, `LEAN_SYSROOT`, or `PATH`
-    // change, so the values describe the bindings this build will link.
+    // build script reruns when `ELAN_TOOLCHAIN`, `LEAN_SYSROOT`, `ELAN_HOME`,
+    // `PATH`, or `lean.h` change, and Cargo recompiles the crate whenever that
+    // script reruns, so the values describe the bindings this build will link.
+    // This compares the bindings with Lake and with the pin; a toolchain whose
+    // contents changed behind an unchanged path is caught by the `lake env
+    // lean --version` check above.
     let bindings_prefix = canonical(&PathBuf::from(
         env::var_os("DEP_LEANSHARED_PREFIX").unwrap_or_else(|| {
             fail(
@@ -150,7 +154,8 @@ fn main() {
             prefix_dir.display()
         ));
     }
-    let bindings_version = env::var("DEP_LEANSHARED_LEAN_VERSION").unwrap_or_default();
+    let bindings_version =
+        env::var("DEP_LEANSHARED_LEAN_VERSION").unwrap_or_else(|_| "<not published>".to_string());
     if bindings_version != pinned_version {
         fail(format!(
             "`lean-rs-sys` was built against Lean {bindings_version} but {} pins {pinned_version}",
