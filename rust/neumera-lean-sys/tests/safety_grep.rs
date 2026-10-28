@@ -30,6 +30,8 @@ const SOURCE_FILES: &[&str] = &[
     "src/string.rs",
     "src/array.rs",
     "src/closure.rs",
+    "src/ctor.rs",
+    "src/memory.rs",
     "src/io.rs",
     "src/init.rs",
     "src/external.rs",

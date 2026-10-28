@@ -6,7 +6,7 @@
 //! toolchain identity below is baked by `build.rs` from the `lean.h` this
 //! crate was built against.
 
-// Tag constants—`lean.h:83–95`.
+// Tag constants: `lean.h` lines 101–113 in the pinned 4.35.0 header.
 pub const LEAN_MAX_CTOR_TAG: u8 = 243;
 pub const LEAN_PROMISE: u8 = 244;
 pub const LEAN_CLOSURE: u8 = 245;
@@ -21,12 +21,12 @@ pub const LEAN_REF: u8 = 253;
 pub const LEAN_EXTERNAL: u8 = 254;
 pub const LEAN_RESERVED: u8 = 255;
 
-// Object-allocator constants—`lean.h:30–32`.
+// Object-allocator constants: `lean.h` lines 31–33.
 pub const LEAN_CLOSURE_MAX_ARGS: usize = 16;
 pub const LEAN_OBJECT_SIZE_DELTA: usize = 8;
 pub const LEAN_MAX_SMALL_OBJECT_SIZE: usize = 4096;
 
-// Constructor-shape ceilings—`lean.h:97–98`.
+// Constructor-shape ceilings: `lean.h` lines 115–116.
 pub const LEAN_MAX_CTOR_FIELDS: usize = 256;
 pub const LEAN_MAX_CTOR_SCALARS_SIZE: usize = 1024;
 

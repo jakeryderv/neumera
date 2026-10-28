@@ -16,8 +16,8 @@
 //! computes the SHA-256 of the pinned toolchain's `include/lean/lean.h` and
 //! requires it to equal the digest recorded in `lean.h.sha256` next to this
 //! crate. A Lean bump therefore changes two files, `lean-toolchain` and
-//! `lean.h.sha256`, and the build fails until the mirrored helpers have been
-//! re-checked against the new header.
+//! `lean.h.sha256`, and the build fails until the digest is deliberately
+//! updated; `VENDORED.md` says what to re-check before doing so.
 //!
 //! Layering:
 //! - Inline mirrors of `lean.h`'s `static inline` helpers live alongside the

@@ -16,7 +16,7 @@
 //!    `DEP_LEAN_HEADER_DIGEST` (this crate declares `links = "lean"`).
 //! 4. Emit link directives for the selected feature (`dynamic` or `static`).
 //! 5. Emit `cargo:rerun-if-*` for every input: the pin file, the digest file,
-//!    the header, `PATH`, and `ELAN_HOME`.
+//!    `lean.h`, `version.h`, `PATH`, and `ELAN_HOME`.
 
 // Build scripts panic to abort the build with a diagnostic; that is the
 // correct failure mode here.
@@ -62,6 +62,13 @@ fn main() {
             )
         })
         .to_string();
+    if !pinned_version.starts_with(|c: char| c.is_ascii_digit()) {
+        panic!(
+            "neumera-lean-sys: {} pins {pin_line:?}; only release pins of the form leanprover/lean4:vX.Y.Z are \
+             supported, because lean.h.sha256 records the header of one release",
+            pin_file.display()
+        );
+    }
 
     let prefix = resolve_prefix(&pin_line);
     let header_path = prefix.join("include").join("lean").join("lean.h");
@@ -117,7 +124,18 @@ fn main() {
     println!("cargo:rerun-if-changed={}", pin_file.display());
     println!("cargo:rerun-if-changed={}", digest_file.display());
     println!("cargo:rerun-if-changed={}", header_path.display());
+    println!(
+        "cargo:rerun-if-changed={}",
+        prefix
+            .join("include")
+            .join("lean")
+            .join("version.h")
+            .display()
+    );
     println!("cargo:rerun-if-changed=build.rs");
+    // Any PATH difference (IDE vs shell, `just` vs direct cargo) reruns this
+    // script and recompiles the two Lean crates. Accepted: PATH decides which
+    // `lean` answers, and the version and digest gates must see the result.
     println!("cargo:rerun-if-env-changed=PATH");
     println!("cargo:rerun-if-env-changed=ELAN_HOME");
 }
