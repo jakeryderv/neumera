@@ -41,10 +41,10 @@ The two crates are consumed from the project's fork, `jakeryderv/lean-rs`, throu
 
 | Pinned commit | Fork tag | Patches relative to upstream |
 |---|---|---|
-| `d2dc03b4c53d6c811d5bef1fe6d481a110c374d1` | none (identical to upstream `v0.9.4`) | none |
+| `8ec5664865f256b5cd71aa36d88c6bec199a3a7e` | `v0.9.4+neumera.1` | `lean-rs-sys` build script: `ELAN_TOOLCHAIN` is a rerun input; resolved prefix, Lean version, and `lean.h` digest emitted as `cargo:` metadata for dependents |
 
 ## Consequences
 
 - The Lean runtime is linked dynamically from the toolchain's `lib/lean/libleanshared.so`. This crate's tests and examples carry an rpath to it. Any downstream crate that produces a binary or `cdylib` must emit its own rpath or bundle the library; the Python wheel will have to solve this, and that is out of scope for this slice.
 - `lean-rs-sys` must support each Lean version this project pins. Bumping the pin means checking its supported window first.
-- Two toolchains pinned at the repository root: `rust-toolchain.toml` and `lean-toolchain`. The Lean pin is repeated as `ELAN_TOOLCHAIN` in `.cargo/config.toml`, because `lean-rs-sys` runs `lean --print-prefix` from its own package directory where the pin file is not visible; the `neumera-lean` build script fails if the two values differ or if `LEAN_SYSROOT` points elsewhere. `lean-rs-sys` does not rerun its build script on a pin change, so after one its bindings in a reused target directory describe the previous toolchain; a compile-time check in `neumera-lean` compares the version the bindings were built against with the one that built the library and fails with instructions to clean that crate.
+- Two toolchains pinned at the repository root: `rust-toolchain.toml` and `lean-toolchain`. The Lean pin is repeated as `ELAN_TOOLCHAIN` in `.cargo/config.toml`, because `lean-rs-sys` runs `lean --print-prefix` from its own package directory where the pin file is not visible; the `neumera-lean` build script fails if the two values differ. The fork's `lean-rs-sys` reruns its build script when `ELAN_TOOLCHAIN` changes and publishes the prefix and version it resolved as `links` metadata (`DEP_LEANSHARED_PREFIX`, `DEP_LEANSHARED_LEAN_VERSION`); the `neumera-lean` build script compares them with Lake's and fails if the bindings and the Lean library would come from different toolchains.

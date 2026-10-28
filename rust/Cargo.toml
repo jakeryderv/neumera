@@ -24,5 +24,5 @@ serde_json = "1"
 # patch only changes where that version's source comes from. The pinned commit
 # and the fork's patches are recorded in docs/binding-layer-evaluation.md.
 [patch.crates-io]
-lean-rs-sys = { git = "https://github.com/jakeryderv/lean-rs", rev = "d2dc03b4c53d6c811d5bef1fe6d481a110c374d1" }
-lean-rs-abi = { git = "https://github.com/jakeryderv/lean-rs", rev = "d2dc03b4c53d6c811d5bef1fe6d481a110c374d1" }
+lean-rs-sys = { git = "https://github.com/jakeryderv/lean-rs", rev = "8ec5664865f256b5cd71aa36d88c6bec199a3a7e" }
+lean-rs-abi = { git = "https://github.com/jakeryderv/lean-rs", rev = "8ec5664865f256b5cd71aa36d88c6bec199a3a7e" }

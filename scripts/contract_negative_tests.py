@@ -36,9 +36,10 @@ Cases (see docs/design-example-sorted-vectors.md, section 4):
      build, an .olean is tampered (the       (artifacts are build inputs)
      manifest is untouched).
 
- 14. (opt-in) Switch the Lean pin to a      -> build fails naming stale
-     second installed toolchain without       lean-rs-sys bindings; passes
-     cleaning the target directory.           after `cargo clean -p lean-rs-sys`
+ 14. (opt-in) Switch the Lean pin to a      -> lean-rs-sys is rebuilt and the
+     second installed toolchain without       build passes; then LEAN_SYSROOT
+     cleaning the target directory.           pointing the bindings at another
+                                              Lean than Lake's fails the build
 
 Case 14 runs only when NEUMERA_ALT_TOOLCHAIN names an installed toolchain that
 lean-rs-sys supports (for example `leanprover/lean4:v4.34.0`).
@@ -356,34 +357,51 @@ def set_pin(root: Path, toolchain: str) -> None:
 
 
 def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
-    """Case 14: switching the pin without cleaning must be caught, because the
-    lean-rs-sys build script does not rerun on a pin change and would leave
-    bindings for the previous toolchain in the target directory."""
+    """Case 14: one toolchain for the bindings and the Lean library.
+
+    (a) Changing the pin must rebuild the `lean-rs-sys` bindings without a
+        manual `cargo clean`; the fork's build script reruns on
+        `ELAN_TOOLCHAIN`. The build under the new pin must pass.
+    (b) Pointing the bindings at a different Lean than Lake (here through
+        `LEAN_SYSROOT`, which Lake ignores) must fail with the prefix check."""
     original = (root / "lean-toolchain").read_text().strip()
     total = 0.0
     try:
         set_pin(root, alt)
         code, out, secs = build(root, {})
         total += secs
-        expect = "lean-rs-sys was compiled against a different Lean version"
-        if code == 0 or expect not in out:
-            return False, "stale bindings were not detected:\n" + out, total
-        code, out, secs = cargo(root, ["clean", "-p", "lean-rs-sys"], {})
-        total += secs
         if code != 0:
-            return False, "cargo clean -p lean-rs-sys failed:\n" + out, total
+            return False, f"build under {alt} failed after a pin change:\n" + out, total
+        if "Compiling lean-rs-sys" not in out:
+            return (
+                False,
+                "lean-rs-sys was not rebuilt after the pin change:\n" + out,
+                total,
+            )
+        set_pin(root, original)
         code, out, secs = build(root, {})
         total += secs
         if code != 0:
+            return False, "build failed after restoring the pin:\n" + out, total
+        alt_prefix = subprocess.run(
+            ["lean", "--print-prefix"],
+            env={**os.environ, "ELAN_TOOLCHAIN": alt},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        code, out, secs = build(root, {"LEAN_SYSROOT": alt_prefix})
+        total += secs
+        expect = "must come from one toolchain"
+        if code == 0 or expect not in out:
             return (
                 False,
-                f"build under {alt} failed after cleaning the bindings:\n" + out,
+                "a bindings/Lake toolchain mismatch was not detected:\n" + out,
                 total,
             )
         return True, out, total
     finally:
         set_pin(root, original)
-        cargo(root, ["clean", "-p", "lean-rs-sys"], {})
 
 
 def main(argv: list[str]) -> int:
