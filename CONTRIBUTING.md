@@ -66,6 +66,9 @@ To add a contract: prove the theorem in `lean/Neumera/`, restate it in `lean/Neu
 - Pull requests are squash-merged, and the PR title becomes the commit message, so give PRs conventional titles too.
 - Both are enforced by `cz check`: locally by the `commit-msg` hook, and in CI by the `pr-title` check.
 - `main` is protected against force-pushes and deletion. PRs need the `ci-ok` and `pr-title` checks to pass; the maintainer can push to `main` directly.
+- Work on a branch and open a draft PR as soon as you push it (`gh pr create --draft --fill`). CI runs on pull requests and on pushes to `main`, not on other branch pushes, so a branch without a PR gets no CI unless you dispatch it by hand (`gh workflow run CI.yml --ref <branch>`).
+- The PR template has a checklist. Changes to `rust/neumera-lean/build.rs`, `unsafe` code, `lean/Manifest.lean`, or the manifest format get an independent adversarial review before merge; record its findings in the PR.
+- Merge with `gh pr merge --squash --delete-branch`. GitHub deletes the remote branch on merge; the flag also deletes your local branch and checks out `main`. Squash merges rewrite history, so `git branch -d` on a merged branch refuses with "not fully merged"; that flag or `git branch -D` is the answer. A plain `git fetch` prunes stale `origin/*` refs (`fetch.prune` is recommended globally); a fetch with an explicit branch argument prunes only that branch.
 
 ## CI
 
