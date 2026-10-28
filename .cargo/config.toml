@@ -1,0 +1,8 @@
+# Pin the Lean toolchain for every process Cargo runs, including dependency
+# build scripts. `lean-rs-sys` locates Lean with a plain `lean --print-prefix`
+# from its own package directory, where elan cannot see this repository's
+# `lean-toolchain` file; this makes elan resolve the same toolchain there.
+# The value must equal the contents of `lean-toolchain`; the `neumera-lean`
+# build script fails if it does not.
+[env]
+ELAN_TOOLCHAIN = "leanprover/lean4:v4.35.0"

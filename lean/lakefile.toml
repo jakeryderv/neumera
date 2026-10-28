@@ -1,5 +1,7 @@
 name = "neumera"
 defaultTargets = ["Neumera"]
 
+# Build the static library by default so the Rust build script can link it.
 [[lean_lib]]
 name = "Neumera"
+defaultFacets = ["static"]

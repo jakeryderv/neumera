@@ -12,6 +12,8 @@ publish = false
 name = "_core"
 crate-type = ["cdylib"]
 
+# This crate does not yet depend on `neumera-lean`. Adding that dependency
+# makes every wheel build run Lake and link the Lean runtime, which is the
+# PyO3 integration slice, not this one.
 [dependencies]
-neumera-lean.workspace = true
 pyo3.workspace = true
