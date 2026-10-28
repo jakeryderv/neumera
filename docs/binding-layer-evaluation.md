@@ -45,6 +45,8 @@ The two crates are consumed from the project's fork, `jakeryderv/lean-rs`, throu
 
 ## Consequences
 
+See `static-linking-spike.md` for the measurement that settles the distribution question: the runtime (`leanrt` + `Init` + the toolchain's static `gmp`, `uv`, `c++`) links statically into a binary with no Lean dependency at run time.
+
 - The Lean runtime is linked dynamically from the toolchain's `lib/lean/libleanshared.so`. This crate's tests and examples carry an rpath to it. Any downstream crate that produces a binary or `cdylib` must emit its own rpath or bundle the library; the Python wheel will have to solve this, and that is out of scope for this slice.
 - `lean-rs-sys` must support each Lean version this project pins. Bumping the pin means checking its supported window first.
 - Two toolchains pinned at the repository root: `rust-toolchain.toml` and `lean-toolchain`. The Lean pin is repeated as `ELAN_TOOLCHAIN` in `.cargo/config.toml`, because `lean-rs-sys` runs `lean --print-prefix` from its own package directory where the pin file is not visible; the `neumera-lean` build script fails if the two values differ. The fork's `lean-rs-sys` reruns its build script when `ELAN_TOOLCHAIN` changes and publishes the prefix and version it resolved as `links` metadata (`DEP_LEANSHARED_PREFIX`, `DEP_LEANSHARED_LEAN_VERSION`); the `neumera-lean` build script compares them with Lake's and fails if the bindings and the Lean library would come from different toolchains.
