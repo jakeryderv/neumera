@@ -1,5 +1,6 @@
-//! Link-time probe: take the address of every symbol in [`REQUIRED_SYMBOLS`].
-//! If `libleanshared` is missing any of them the test binary fails to link.
+//! Link-time probe: take the address of every symbol in [`REQUIRED_SYMBOLS`]
+//! (and, under `dynamic`, [`COMPILER_SYMBOLS`]). If the linked runtime is
+//! missing any of them the test binary fails to link.
 
 use neumera_lean_sys::REQUIRED_SYMBOLS;
 
@@ -11,10 +12,6 @@ use neumera_lean_sys::REQUIRED_SYMBOLS;
 fn all_required_symbols_resolve_at_link_time() {
     let addresses: &[(*const (), &str)] = &[
         // init / runtime
-        (
-            neumera_lean_sys::init::lean_initialize as *const (),
-            "lean_initialize",
-        ),
         (
             neumera_lean_sys::init::lean_initialize_runtime_module as *const (),
             "lean_initialize_runtime_module",
@@ -391,4 +388,21 @@ fn all_required_symbols_resolve_at_link_time() {
         addresses.len(),
         REQUIRED_SYMBOLS.len(),
     );
+}
+
+#[cfg(feature = "dynamic")]
+#[test]
+#[cfg_attr(
+    miri,
+    ignore = "asserts link-time symbol resolution; Miri does not link libleanshared"
+)]
+fn compiler_symbols_resolve_at_link_time_in_dynamic_mode() {
+    let addresses: &[(*const (), &str)] = &[(
+        neumera_lean_sys::init::lean_initialize as *const (),
+        "lean_initialize",
+    )];
+    for (addr, name) in addresses {
+        assert!(!addr.is_null(), "{name} resolved to a null address");
+    }
+    assert_eq!(addresses.len(), neumera_lean_sys::COMPILER_SYMBOLS.len());
 }

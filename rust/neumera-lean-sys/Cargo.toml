@@ -10,12 +10,12 @@ publish = false
 links = "lean"
 
 [features]
-# `dynamic` links `libleanshared`. `static` emits upstream's archive list, which
-# includes the compiler and Lake and does not currently link a binary on Linux
-# (it names `stdc++` where the archives need `c++`); the lib target builds, test
-# binaries do not. It is kept only as the starting point for the runtime-only
-# static mode described in docs/static-linking-spike.md. Exactly one of the two
-# must be enabled.
+# `dynamic` links `libleanshared` with an rpath into the toolchain (fast links,
+# toolchain required at run time). `static` links the runtime archives (`leanrt`,
+# `Init`, and the toolchain's `gmp`, `uv`, `c++`, `c++abi`) into this crate's
+# rlib, so executables run without a toolchain; Linux only, and not linkable
+# into a shared object as shipped (see docs/static-linking-spike.md). Exactly one
+# of the two must be enabled.
 default = ["dynamic"]
 dynamic = []
 static = []

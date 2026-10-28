@@ -52,7 +52,7 @@ pub mod types;
 pub(crate) mod repr;
 
 pub use consts::{LEAN_HEADER_DIGEST, LEAN_HEADER_PATH, LEAN_VERSION};
-pub use symbols::REQUIRED_SYMBOLS;
+pub use symbols::{COMPILER_SYMBOLS, REQUIRED_SYMBOLS};
 pub use types::{
     b_lean_obj_arg, b_lean_obj_res, lean_obj_arg, lean_obj_res, lean_object, u_lean_obj_arg,
 };

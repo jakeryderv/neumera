@@ -486,7 +486,9 @@ mod tests {
 
     use super::{lean_box_float, lean_box_uint32, lean_box_uint64, lean_box_usize};
     use super::{lean_unbox_float, lean_unbox_uint32, lean_unbox_uint64, lean_unbox_usize};
-    use crate::init::{lean_initialize, lean_initialize_runtime_module};
+    #[cfg(feature = "dynamic")]
+    use crate::init::lean_initialize;
+    use crate::init::lean_initialize_runtime_module;
     use crate::io::lean_io_mark_end_initialization;
     use crate::object::lean_box;
     use crate::refcount::lean_dec;
@@ -502,6 +504,7 @@ mod tests {
             // SAFETY: standard Lean init sequence (`lean.h` "How to use").
             unsafe {
                 lean_initialize_runtime_module();
+                #[cfg(feature = "dynamic")]
                 lean_initialize();
                 lean_io_mark_end_initialization();
             }

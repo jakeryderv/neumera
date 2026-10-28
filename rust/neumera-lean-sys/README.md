@@ -2,6 +2,6 @@
 
 Raw FFI bindings for the Lean 4 C ABI, pinned to the Lean toolchain in the repository's `lean-toolchain`. Every function is `unsafe`; `neumera-lean` is the safe layer on top.
 
-The build script resolves the pinned toolchain, checks its `lean.h` against `lean.h.sha256`, and links `libleanshared` (feature `dynamic`, default). The `static` feature is inherited from upstream and does not yet produce a linkable binary on Linux; the runtime-only static mode is the next step (see `docs/static-linking-spike.md`). It publishes the resolved prefix and version to dependents as `DEP_LEAN_PREFIX` and `DEP_LEAN_VERSION`.
+The build script resolves the pinned toolchain, checks its `lean.h` against `lean.h.sha256`, and links the Lean runtime one of two ways: feature `dynamic` (default) links `libleanshared` with an rpath into the toolchain; feature `static` links the runtime archives (`leanrt`, `Init`, and the toolchain's `gmp`, `uv`, `c++`, `c++abi`) into the rlib, so executables need no toolchain at run time (Linux only, and not yet linkable into a shared object; see `docs/static-linking-spike.md`). `lean_initialize`, the compiler entry point, exists under `dynamic` only. It publishes the resolved prefix, version, and link mode to dependents as `DEP_LEAN_PREFIX`, `DEP_LEAN_VERSION`, and `DEP_LEAN_LINK_MODE`.
 
 Vendored from `lean-rs-sys` and `lean-rs-abi`; provenance, licence, changes, and the Lean bump procedure are in `VENDORED.md`.
