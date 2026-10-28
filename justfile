@@ -33,6 +33,10 @@ test: dev
     uv run pytest
     cargo test --manifest-path rust/Cargo.toml
 
+# Build and test the Lean crate with the runtime linked statically (Linux only)
+test-static:
+    cargo test --manifest-path rust/Cargo.toml -p neumera-lean --no-default-features --features static
+
 # Contract manifest negative tests: each mutation must fail the Rust build
 negative-tests:
     uv run --no-sync python scripts/contract_negative_tests.py

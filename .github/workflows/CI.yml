@@ -100,6 +100,34 @@ jobs:
       - name: Run negative tests
         run: uv run --no-project python scripts/contract_negative_tests.py
 
+  # Static link mode: the Lean runtime inside the binary, no toolchain at run
+  # time. The ordinary `check` job covers the dynamic mode.
+  static-link:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Rust toolchain (from rust-toolchain.toml)
+        run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust
+          key: static
+      - name: Install Lean and build the Lean library
+        uses: leanprover/lean-action@v1
+        with:
+          lake-package-directory: lean
+          auto-config: false
+          build: true
+          test: false
+          lint: false
+      - name: Put elan on PATH for later steps
+        run: echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: just
+      - name: Build and test with the runtime linked statically
+        run: just test-static
+
   linux:
     runs-on: ${{ matrix.platform.runner }}
     strategy:
@@ -245,7 +273,7 @@ jobs:
   # Single required status check that summarizes every job above
   ci-ok:
     if: always()
-    needs: [check, contracts, linux, macos, windows, sdist, test-wheels]
+    needs: [check, contracts, static-link, linux, macos, windows, sdist, test-wheels]
     runs-on: ubuntu-latest
     steps:
       - name: Fail unless all jobs succeeded

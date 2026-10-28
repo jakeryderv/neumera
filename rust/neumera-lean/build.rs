@@ -297,9 +297,12 @@ fn main() {
     let generated = render_contracts(&manifest, &prefix);
     fs::write(out_dir.join("contracts.rs"), generated).unwrap();
 
-    // 8. Link the static library. `neumera-lean-sys` links the Lean runtime
-    //    (`libleanshared`) and sets the rpath for its own targets; this crate's
-    //    tests and examples need the rpath too.
+    // 8. Link the Lake-built static library. `neumera-lean-sys` links the Lean
+    //    runtime and publishes how: in `dynamic` mode it links `libleanshared`,
+    //    and this crate's binaries (tests, examples) need an rpath into the
+    //    toolchain to find it, since link arguments do not propagate from a
+    //    dependency. In `static` mode the runtime is inside the sys rlib and no
+    //    rpath is emitted, so a binary never reaches into the toolchain.
     let lib_name = static_lib
         .file_stem()
         .and_then(|s| s.to_str())
@@ -312,13 +315,21 @@ fn main() {
         });
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=static={lib_name}");
-    let runtime_lib_dir = prefix_dir.join("lib").join("lean");
-    // Applies to every binary this package links (unit and integration tests,
-    // examples). Downstream crates that produce binaries must emit their own.
-    println!(
-        "cargo:rustc-link-arg=-Wl,-rpath,{}",
-        runtime_lib_dir.display()
-    );
+    match env::var("DEP_LEAN_LINK_MODE").as_deref() {
+        Ok("dynamic") => {
+            // Applies to every binary this package links. Downstream crates
+            // that produce binaries must emit their own.
+            let runtime_lib_dir = prefix_dir.join("lib").join("lean");
+            println!(
+                "cargo:rustc-link-arg=-Wl,-rpath,{}",
+                runtime_lib_dir.display()
+            );
+        }
+        Ok("static") => {}
+        other => fail(format!(
+            "DEP_LEAN_LINK_MODE is {other:?}: `neumera-lean-sys` did not publish its link mode"
+        )),
+    }
 }
 
 /// Identity: schema, toolchain, version, and every recorded artifact bound to

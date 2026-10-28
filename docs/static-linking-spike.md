@@ -2,6 +2,8 @@
 
 Date: 2026-10-28. Platform: Linux x86_64, Lean 4.35.0, Rust 1.99.
 
+**Status:** adopted. The `static` feature of `neumera-lean-sys` (forwarded by `neumera-lean`) links exactly this set; `just test-static` and CI's `static-link` job exercise it. Measurements made while adopting it are in *Follow-up measurements* below.
+
 ## Question
 
 Can a binary call compiled Lean code without the toolchain present at run time? Today `neumera-lean` links `libleanshared.so` with an rpath into `~/.elan`, which cannot ship in a wheel.
@@ -27,14 +29,20 @@ All archives come from the toolchain: `lib/lean/` holds `Init` and `leanrt`; `li
 
 ## Consequences for the owned sys crate
 
-1. Default to static linking of `leanrt` + `Init` + the toolchain's `gmp`, `uv`, `c++`, `c++abi`, with the link group. Keep dynamic `libleanshared` as an opt-in feature for development builds that want faster links.
+1. Static linking of `leanrt` + `Init` + the toolchain's `gmp`, `uv`, `c++`, `c++abi` is the `static` feature. `dynamic` (`libleanshared` with an rpath) stays the default for development builds until the Python extension has been linked statically; dropping it then is the simplification to make.
 2. The header-digest gate stays: the mirrored inline helpers depend on the header layout, and the gate is what makes a Lean bump safe.
-3. A PyO3 extension module is a shared object, not an executable; the same archives link into it. Position independence must be checked (the toolchain archives are expected to be PIC since `libleanshared.so` is built from them). That is the next measurement before any Python work.
+3. A PyO3 extension module is a shared object, not an executable; the same archives link into it. Position independence is confirmed below.
+
+## Follow-up measurements (same day, while adopting the result)
+
+- **No linker group is needed when the archives are linked from a crate.** rustc bundles each `static=` archive named by a build script into the crate's rlib, so the final link sees one archive and the `Init`/`leanrt` cycle resolves on its own. Link arguments from a dependency's build script do not reach dependents' binaries, so the group could not have been emitted from the sys crate anyway.
+- **Every archive is position-independent.** `readelf -r` finds zero `R_X86_64_32`/`R_X86_64_32S` relocations in `libInit.a` (209,722 relocations), `libleanrt.a`, `libgmp.a`, `libuv.a`, `libc++.a`, `libc++abi.a`, and the Lake-built `libneumera_Neumera.a`. The same archives can link into a shared object.
+- **Lean's mimalloc does not override `malloc`.** `libleanrt.a` defines `mi_malloc`, `mi_free`, and 186 other `mi_*` symbols, and no `malloc`, `free`, `calloc`, `realloc`, or `operator new`; `lean.h` calls `mi_malloc` by name under `LEAN_MIMALLOC`. A Python process keeps its own allocator and Lean objects live in mimalloc's heap; the two do not interpose on each other. A static test binary exports no allocator symbol.
+- **Static test binaries** depend only on `libc`, `libm`, `libgcc_s`, and the loader, carry no `RUNPATH`, and pass under `env -i PATH=/usr/bin:/bin`.
 
 ## Open
 
 - macOS: archive names and the `c++` linkage differ (`lean-sys` links `c++` and `c++abi` dynamically there). Not tested.
-- Lean's `mimalloc` is inside `libleanrt.a`; a Python process already has its own allocator. Whether the two coexist cleanly in one process is untested.
 - Initialization in a Python extension: `lean_initialize_runtime_module` must run once per process and `lean_io_mark_end_initialization` after module init; the existing `runtime::init` design covers this but has only been exercised in executables.
 
 ## Spike source

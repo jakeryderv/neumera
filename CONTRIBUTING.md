@@ -40,6 +40,7 @@ Run `just` to list all recipes.
 | `just fmt` | Format Python and Rust |
 | `just lint` | Lockfile check, ruff, ty, clippy |
 | `just check` | Everything CI's check job runs: build, format check, lint, tests |
+| `just test-static` | Build and test the Lean crate with the runtime linked statically (CI's `static-link` job); Linux only |
 | `just negative-tests` | Contract manifest negative tests (CI's `contracts` job); a few minutes |
 | `just lean` | Build the Lean library alone (the Rust build script does this too) |
 | `just commit` | Write a commit interactively (Conventional Commits prompt) |
@@ -76,6 +77,7 @@ To add a contract: prove the theorem in `lean/Neumera/`, restate it in `lean/Neu
 `.github/workflows/CI.yml` runs on pushes to `main` and on pull requests:
 
 - **check**: installs Lean with `leanprover/lean-action`, then `just check` and the stub check, on Python 3.12 and 3.14.
+- **static-link**: the same Lean setup, then `just test-static`: the Lean crate built with `--no-default-features --features static`, which links the runtime into the binary; a test asserts no toolchain library is mapped into the process.
 - **contracts**: the manifest negative tests (`scripts/contract_negative_tests.py`).
 - **wheels**: builds wheels where Lean ships a prebuilt toolchain: x86-64 and aarch64 Linux (manylinux_2_28, since Lean needs glibc 2.26+), Apple Silicon macOS, plus the sdist. Intel macOS and x86-64 Windows are built best-effort and don't block `ci-ok`.
 - **test-wheels**: installs the built wheels and runs the tests on each platform that can run them natively.

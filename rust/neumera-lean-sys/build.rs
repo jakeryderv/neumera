@@ -11,10 +11,13 @@
 //!    in `src/` are written against that header; a different header must be
 //!    re-checked before the digest is updated.
 //! 3. Emit `cargo:rustc-env=…` for `src/consts.rs`, and `cargo:prefix`,
-//!    `cargo:version`, `cargo:header_digest` metadata, which Cargo exposes to
-//!    dependents' build scripts as `DEP_LEAN_PREFIX`, `DEP_LEAN_VERSION`,
-//!    `DEP_LEAN_HEADER_DIGEST` (this crate declares `links = "lean"`).
-//! 4. Emit link directives for the selected feature (`dynamic` or `static`).
+//!    `cargo:version`, `cargo:header_digest`, `cargo:link_mode` metadata, which
+//!    Cargo exposes to dependents' build scripts as `DEP_LEAN_PREFIX`,
+//!    `DEP_LEAN_VERSION`, `DEP_LEAN_HEADER_DIGEST`, `DEP_LEAN_LINK_MODE` (this
+//!    crate declares `links = "lean"`).
+//! 4. Emit link directives for the selected feature: `dynamic` links
+//!    `libleanshared` with an rpath into the toolchain; `static` links the
+//!    runtime archives into the rlib so binaries need no toolchain at run time.
 //! 5. Emit `cargo:rerun-if-*` for every input: the pin file, the digest file,
 //!    `lean.h`, `version.h`, `PATH`, and `ELAN_HOME`.
 
@@ -131,6 +134,10 @@ fn main() {
     println!("cargo:prefix={}", prefix.display());
     println!("cargo:version={installed_version}");
     println!("cargo:header_digest={actual_digest}");
+    println!(
+        "cargo:link_mode={}",
+        if static_link { "static" } else { "dynamic" }
+    );
 
     emit_link_directives(&prefix, static_link);
 
@@ -218,28 +225,29 @@ fn emit_link_directives(prefix: &Path, static_link: bool) {
 
     let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap_or_default();
     if static_link {
-        // Inherited from upstream; links the compiler and Lake as well as the
-        // runtime. The runtime-only set is in docs/static-linking-spike.md and
-        // replaces this in a follow-up.
-        for lib in ["Lean", "Init", "leanrt", "leancpp", "Lake"] {
+        // Runtime only: `leanrt` (allocator, objects, IO) and `Init` (the Lean
+        // prelude compiled Lean code links against), plus the C libraries they
+        // need, all taken from the toolchain's own static archives so nothing
+        // but libc comes from the system. `Lean`, `leancpp`, and `Lake` are the
+        // compiler and build tool and are not linked. See
+        // docs/static-linking-spike.md for the measurements.
+        //
+        // rustc bundles every `static=` archive named here into this crate's
+        // rlib, so the final link sees one archive and the mutual references
+        // between `Init` and `leanrt` resolve without a linker group. Link
+        // arguments would not propagate to dependents' binaries anyway.
+        if target_os != "linux" {
+            panic!(
+                "neumera-lean-sys: the `static` feature is implemented for Linux only (target_os={target_os}); \
+                 use the `dynamic` feature elsewhere"
+            );
+        }
+        for lib in ["Init", "leanrt", "gmp", "uv", "c++", "c++abi"] {
             println!("cargo:rustc-link-lib=static={lib}");
         }
-        match target_os.as_str() {
-            "macos" => {
-                println!("cargo:rustc-link-lib=dylib=c++");
-                println!("cargo:rustc-link-lib=dylib=c++abi");
-            }
-            "linux" => {
-                for lib in ["stdc++", "dl", "pthread", "m"] {
-                    println!("cargo:rustc-link-lib=dylib={lib}");
-                }
-            }
-            other => println!(
-                "cargo:warning=neumera-lean-sys: no platform link directives for target_os={other}"
-            ),
+        for lib in ["pthread", "dl", "m", "rt"] {
+            println!("cargo:rustc-link-lib=dylib={lib}");
         }
-        println!("cargo:rustc-link-lib=dylib=gmp");
-        println!("cargo:rustc-link-lib=dylib=uv");
     } else {
         println!("cargo:rustc-link-lib=dylib=leanshared");
         // rpath for this crate's own binaries (tests). `cargo:rustc-link-arg`

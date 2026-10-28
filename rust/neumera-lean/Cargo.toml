@@ -9,6 +9,13 @@ repository.workspace = true
 publish = false
 links = "neumera_Neumera"
 
+[features]
+# Link mode of the Lean runtime, forwarded to `neumera-lean-sys`: `dynamic`
+# needs the toolchain at run time, `static` does not (Linux only so far).
+default = ["dynamic"]
+dynamic = ["neumera-lean-sys/dynamic"]
+static = ["neumera-lean-sys/static"]
+
 [dependencies]
 neumera-lean-sys.workspace = true
 
