@@ -4,7 +4,7 @@ This is the canonical guide to developing and releasing neumera.
 
 ## Setup
 
-Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://just.systems/), [rustup](https://rustup.rs/), and [elan](https://github.com/leanprover/elan). The Rust toolchain version is pinned in `rust-toolchain.toml` and installed automatically by rustup; the Lean toolchain is pinned in `lean/lean-toolchain` and installed automatically by elan when Lake runs; uv manages Python and all Python tooling.
+Prerequisites: [uv](https://docs.astral.sh/uv/), [just](https://just.systems/), [rustup](https://rustup.rs/), and [elan](https://github.com/leanprover/elan). The Rust toolchain version is pinned in `rust-toolchain.toml` and installed automatically by rustup; the Lean toolchain is pinned in `lean-toolchain` at the repository root (`lean/lean-toolchain` is a symlink to it, so Lake and elan find it from either place) and installed automatically by elan the first time `lean` or `lake` runs; uv manages Python and all Python tooling.
 
 ```sh
 git clone https://github.com/jakeryderv/neumera.git
@@ -18,10 +18,11 @@ just setup
 
 | Path | Contents |
 |---|---|
-| `lean/` | Lake package: Lean definitions, implementations, proofs, and the contract manifest emitter |
+| `lean/` | Lake package: Lean definitions and proofs (`Neumera/`), the contracts module (`Neumera/Contracts.lean`), and the manifest emitter (`Manifest.lean`) |
 | `rust/` | Cargo workspace; the version lives in its `Cargo.toml` |
-| `rust/neumera-lean/` | Lean integration crate: runtime connection, property-carrying wrappers, manifest consumer. No Python dependency. Name provisional |
-| `rust/neumera-py/` | PyO3 adapter over `neumera-lean`, compiled to the `neumera._core` extension module |
+| `rust/neumera-lean/` | Lean integration crate: runs Lake and the manifest emitter from `build.rs`, validates build identity, generates `contracts`, links the Lean library. No Python dependency. Name provisional |
+| `rust/neumera-py/` | PyO3 adapter, compiled to the `neumera._core` extension module. Does not yet depend on `neumera-lean` |
+| `scripts/` | `contract_negative_tests.py`: mutations that must fail the Rust build |
 | `src/neumera/` | Python package; re-exports the public API from `_core` |
 | `docs/` | Design documents; start with `bringing-mathematical-meaning-into-everyday-programming.md` |
 | `src/neumera/_core.pyi` | Type stubs, **generated** from the compiled extension |
@@ -38,9 +39,17 @@ Run `just` to list all recipes.
 | `just fmt` | Format Python and Rust |
 | `just lint` | Lockfile check, ruff, ty, clippy |
 | `just check` | Everything CI's check job runs: build, format check, lint, tests |
+| `just negative-tests` | Contract manifest negative tests (CI's `contracts` job); a few minutes |
+| `just lean` | Build the Lean library alone (the Rust build script does this too) |
 | `just commit` | Write a commit interactively (Conventional Commits prompt) |
 
 Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint` before each commit and check the commit message format (see below); bypass them with `git commit --no-verify` if you need to.
+
+### Lean and the contract manifest
+
+The `neumera-lean` build script runs `lake build` in `lean/`, then runs `lean/Manifest.lean` to audit every theorem in `Neumera.Contracts` (axioms must be in the allowlist; `sorry` fails the build) and write `lean/.lake/build/contracts-manifest.json`. It recomputes the hashes of the static library, the checked `.olean` files, and `lake-manifest.json`, compares them with the manifest, and only then generates `contracts.rs` with one constant per contract. A Rust rule that relies on a contract references its constant. Lake is incremental, so a no-op rebuild costs about a second. Set `NEUMERA_LEAN_MANIFEST=<path>` to validate a supplied manifest in place of the emitted one; the emitter still runs, the supplied file must match its contract metadata and module set exactly, and only the recorded identity can differ. The negative tests use this to prove a stale or tampered manifest is rejected.
+
+To add a contract: prove the theorem in `lean/Neumera/`, restate it in `lean/Neumera/Contracts.lean` with a doc comment `export: <symbol>`, reference the generated constant from the Rust rule, and add a negative-test case if the new contract introduces a new way to drift.
 
 ### Type stubs
 
@@ -62,7 +71,8 @@ Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint`
 
 `.github/workflows/CI.yml` runs on pushes to `main` and on pull requests:
 
-- **check**: `just check` and the stub check, on Python 3.12 and 3.14.
+- **check**: installs Lean with `leanprover/lean-action`, then `just check` and the stub check, on Python 3.12 and 3.14.
+- **contracts**: the manifest negative tests (`scripts/contract_negative_tests.py`).
 - **wheels**: builds wheels where Lean ships a prebuilt toolchain: x86-64 and aarch64 Linux (manylinux_2_28, since Lean needs glibc 2.26+), Apple Silicon macOS, plus the sdist. Intel macOS and x86-64 Windows are built best-effort and don't block `ci-ok`.
 - **test-wheels**: installs the built wheels and runs the tests on each platform that can run them natively.
 - **ci-ok**: a single job that passes only if all of the above passed; this is a required check.
@@ -71,7 +81,7 @@ Run `just dev` after changing Rust code. The git hooks run `just fmt-check lint`
 
 ## Dependencies
 
-Dependabot opens weekly grouped PRs for GitHub Actions, Cargo, uv, and the Rust toolchain. It has no support for elan or Lake, so the Lean toolchain pin in `lean/lean-toolchain` and any Lake dependencies are updated by hand.
+Dependabot opens weekly grouped PRs for GitHub Actions, Cargo, uv, and the Rust toolchain. It has no support for elan or Lake, so the Lean toolchain pin in `lean-toolchain` and any Lake dependencies are updated by hand. Before bumping the Lean pin, check that `lean-rs-sys` supports the new version (see `docs/binding-layer-evaluation.md`), and update `ELAN_TOOLCHAIN` in `.cargo/config.toml` to the same value; the build fails if the two disagree.
 
 - GitHub Actions updates and minor/patch uv updates merge automatically once CI passes.
 - Cargo and Rust toolchain updates need a manual merge. A pyo3 bump can change the generated stubs: check out the PR, run `just dev`, and commit the updated `_core.pyi`.

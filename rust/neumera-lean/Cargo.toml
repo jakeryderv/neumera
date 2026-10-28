@@ -5,7 +5,13 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-# Name is provisional and the crate has no API yet; not published until both settle.
+# Name is provisional and the API is a first slice; not published until both settle.
 publish = false
+links = "neumera_Neumera"
 
 [dependencies]
+lean-rs-sys.workspace = true
+
+[build-dependencies]
+serde.workspace = true
+serde_json.workspace = true

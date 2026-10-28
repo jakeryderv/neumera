@@ -33,6 +33,10 @@ test: dev
     uv run pytest
     cargo test --manifest-path rust/Cargo.toml
 
+# Contract manifest negative tests: each mutation must fail the Rust build
+negative-tests:
+    uv run --no-sync python scripts/contract_negative_tests.py
+
 
 # --- Code quality ---------------------------------------------
 
@@ -42,6 +46,10 @@ lint:
     uv run ruff check .
     uv run ty check
     cargo clippy --manifest-path rust/Cargo.toml --all-targets -- -D warnings
+
+# Build the Lean library and emit the contract manifest (cargo does this too)
+lean:
+    cd lean && lake build
 
 # Check formatting without modifying files
 fmt-check:
