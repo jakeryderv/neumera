@@ -5,7 +5,7 @@ Read `CONTRIBUTING.md` first; it is the source of truth for layout, commands, an
 ## Environment
 
 - `lean`, `lake`, and `elan` live in `~/.elan/bin`, which non-interactive shells may not have on `PATH`. Prepend it before running Lake or building `rust/neumera-lean`.
-- The Lean pin is `lean-toolchain` at the repository root, and `rust/neumera-lean-sys/lean.h.sha256` records the digest of that toolchain's `lean.h`. A pin bump fails the build until the digest is deliberately updated; see `rust/neumera-lean-sys/VENDORED.md` for the procedure.
+- The Lean pin is `lean-toolchain` at the repository root, and `rust/neumera-lean-sys/lean.h.sha256` records the digest of that toolchain's `lean.h`. A pin bump whose `lean.h` differs fails the build until the digest is deliberately updated (versions that share a header, such as a release and its last candidate, pass the digest gate but must still match the pin); see `rust/neumera-lean-sys/VENDORED.md` for the procedure.
 
 ## Workflow
 

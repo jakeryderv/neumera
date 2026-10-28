@@ -40,12 +40,14 @@ Cases (see docs/design-example-sorted-vectors.md, section 4):
      (rust/neumera-lean-sys/lean.h.sha256).    digest mismatch
 
  15. (opt-in) Switch the Lean pin to a      -> build fails on the digest gate;
-     second installed toolchain without       after recording that toolchain's
-     cleaning the target directory.           lean.h digest the bindings rebuild
-                                              and the build passes
+     second installed toolchain whose          after recording that toolchain's
+     lean.h differs, without cleaning the      lean.h digest the bindings rebuild
+     target directory.                         and the build passes
 
 Case 15 runs only when NEUMERA_ALT_TOOLCHAIN names a second installed toolchain
-(for example `leanprover/lean4:v4.34.0`).
+(for example `leanprover/lean4:v4.34.0`). Its lean.h must differ from the
+pinned one; a release and its last candidates share a header, and the case
+reports that it was skipped for such a pair.
 
 Usage: python scripts/contract_negative_tests.py [--keep]
 Standard library only. Needs cargo, lake, and lean on PATH.
@@ -375,6 +377,23 @@ def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
         with `neumera-lean-sys` rebuilt and no manual `cargo clean`."""
     original_pin = (root / "lean-toolchain").read_text()
     original_digest = (root / DIGEST_FILE).read_text()
+    probe = subprocess.run(
+        ["lean", "--print-prefix"],
+        env={**os.environ, "ELAN_TOOLCHAIN": alt},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if probe.returncode != 0:
+        return False, f"cannot resolve {alt}:\n" + probe.stderr, 0.0
+    header = Path(probe.stdout.strip()) / "include" / "lean" / "lean.h"
+    alt_digest = hashlib.sha256(header.read_bytes()).hexdigest()
+    if alt_digest == original_digest.strip():
+        return (
+            True,
+            f"skipped: {alt} shares lean.h with the pinned toolchain, so the digest gate has nothing to reject",
+            0.0,
+        )
     total = 0.0
     try:
         set_pin(root, alt)
@@ -387,19 +406,7 @@ def case_toolchain_switch(root: Path, alt: str) -> tuple[bool, str, float]:
                 "pin change was not stopped by the digest gate:\n" + out,
                 total,
             )
-        probe = subprocess.run(
-            ["lean", "--print-prefix"],
-            env={**os.environ, "ELAN_TOOLCHAIN": alt},
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if probe.returncode != 0:
-            return False, f"cannot resolve {alt}:\n" + probe.stderr, total
-        header = Path(probe.stdout.strip()) / "include" / "lean" / "lean.h"
-        (root / DIGEST_FILE).write_text(
-            hashlib.sha256(header.read_bytes()).hexdigest() + "\n"
-        )
+        (root / DIGEST_FILE).write_text(alt_digest + "\n")
         code, out, secs = build(root, {})
         total += secs
         if code != 0:

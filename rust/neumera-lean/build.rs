@@ -20,6 +20,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use std::sync::OnceLock;
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
@@ -89,8 +90,11 @@ fn main() {
 
     // 1. Toolchain pin: Lake and the FFI bindings must use the same Lean.
     //
-    // Lake resolves the pin through `lean/lean-toolchain` (a symlink to the
-    // repository root file). `neumera-lean-sys` resolves the same file itself
+    // Every Lake invocation below runs with `ELAN_TOOLCHAIN` set to the pin
+    // line, exactly as `neumera-lean-sys` resolves it, so the caller's
+    // environment and elan directory overrides cannot select another Lean for
+    // either side (Lake would otherwise read `lean/lean-toolchain`, a symlink
+    // to the repository root file, and honour overrides). `neumera-lean-sys` resolves the same file itself
     // and publishes the prefix and version it used as `links` metadata, which
     // Cargo passes to this script as `DEP_LEAN_*`; Cargo recompiles that crate
     // whenever its build script reruns, so the values describe the bindings
@@ -105,6 +109,7 @@ fn main() {
         .next()
         .map(|v| v.trim_start_matches('v').to_string())
         .unwrap_or_default();
+    PIN.set(pinned_line.clone()).expect("pin is set once");
     let lean_version_line = run(&lean_dir, "lake", &["env", "lean", "--version"]);
     let running_version = parse_lean_version(&lean_version_line);
     if running_version != pinned_version {
@@ -517,6 +522,7 @@ fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration,
     };
     let mut child = Command::new(program)
         .args(args)
+        .env("ELAN_TOOLCHAIN", pin())
         .current_dir(dir)
         .stdout(Stdio::from(open(&stdout_path)))
         .stderr(Stdio::from(open(&stderr_path)))
@@ -562,9 +568,18 @@ fn run_with_timeout(dir: &Path, program: &str, args: &[&str], timeout: Duration,
     }
 }
 
+/// The `lean-toolchain` pin line; every `lean`/`lake` child runs with
+/// `ELAN_TOOLCHAIN` set to it (see step 1 in `main`).
+static PIN: OnceLock<String> = OnceLock::new();
+
+fn pin() -> &'static str {
+    PIN.get().expect("pin is set before any Lake invocation")
+}
+
 fn run(dir: &Path, program: &str, args: &[&str]) -> String {
     let output = Command::new(program)
         .args(args)
+        .env("ELAN_TOOLCHAIN", pin())
         .current_dir(dir)
         .output()
         .unwrap_or_else(|e| {

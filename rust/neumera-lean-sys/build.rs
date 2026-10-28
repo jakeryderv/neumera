@@ -1,7 +1,7 @@
 //! Build script for `neumera-lean-sys`.
 //!
-//! 1. Find the repository's `lean-toolchain` pin by walking up from this
-//!    crate's directory, and resolve that toolchain's prefix by running
+//! 1. Read the repository's `lean-toolchain` (two directories up from this
+//!    crate), and resolve that toolchain's prefix by running
 //!    `lean --print-prefix` with `ELAN_TOOLCHAIN` set to the pin. elan's proxy
 //!    honours the variable ahead of any `lean-toolchain` file, so the result
 //!    does not depend on the current directory.
@@ -40,7 +40,20 @@ fn main() {
 
     let manifest_dir =
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR"));
-    let pin_file = find_pin_file(&manifest_dir);
+    // The repository root pin, two levels up (`<repo>/rust/neumera-lean-sys`).
+    // Resolved explicitly rather than by searching ancestors, so a stray
+    // `lean-toolchain` nearer this crate cannot change the result.
+    let pin_file = manifest_dir
+        .parent()
+        .and_then(Path::parent)
+        .expect("crate lives at <repo>/rust/neumera-lean-sys")
+        .join("lean-toolchain");
+    if !pin_file.is_file() {
+        panic!(
+            "neumera-lean-sys: no lean-toolchain at {}",
+            pin_file.display()
+        );
+    }
     let pin_line = fs::read_to_string(&pin_file)
         .unwrap_or_else(|err| {
             panic!(
@@ -138,24 +151,6 @@ fn main() {
     // `lean` answers, and the version and digest gates must see the result.
     println!("cargo:rerun-if-env-changed=PATH");
     println!("cargo:rerun-if-env-changed=ELAN_HOME");
-}
-
-/// The repository's `lean-toolchain`: the nearest one in an ancestor of this
-/// crate's directory. The crate is a workspace member, so this is the file at
-/// the repository root that Lake also reads (through `lean/lean-toolchain`).
-fn find_pin_file(manifest_dir: &Path) -> PathBuf {
-    let mut dir = Some(manifest_dir);
-    while let Some(d) = dir {
-        let candidate = d.join("lean-toolchain");
-        if candidate.is_file() {
-            return candidate;
-        }
-        dir = d.parent();
-    }
-    panic!(
-        "neumera-lean-sys: no lean-toolchain file in {} or any parent directory",
-        manifest_dir.display()
-    );
 }
 
 fn resolve_prefix(pin_line: &str) -> PathBuf {
