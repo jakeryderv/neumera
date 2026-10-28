@@ -148,6 +148,10 @@ jobs:
 
   # Install the built wheels and run the test suite against them, natively on
   # each platform. Best-effort platforms may be missing their artifact.
+  #
+  # The wheel is installed with --no-index, so this job cannot resolve runtime
+  # dependencies. The project has none by design. If one is ever added, install
+  # it from the index first and then the wheel with --no-index --no-deps.
   test-wheels:
     needs: [linux, macos, windows]
     runs-on: ${{ matrix.platform.runner }}
