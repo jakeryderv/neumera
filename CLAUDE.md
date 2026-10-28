@@ -6,7 +6,6 @@ Read `CONTRIBUTING.md` first; it is the source of truth for layout, commands, an
 
 - `lean`, `lake`, and `elan` live in `~/.elan/bin`, which non-interactive shells may not have on `PATH`. Prepend it before running Lake or building `rust/neumera-lean`.
 - Run cargo from inside the repository so `.cargo/config.toml` applies; it pins `ELAN_TOOLCHAIN` for dependency build scripts. The build fails with an explanation otherwise.
-- After changing the Lean pin, run `cargo clean -p lean-rs-sys`.
 
 ## Workflow
 

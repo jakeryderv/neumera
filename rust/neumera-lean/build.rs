@@ -128,15 +128,39 @@ fn main() {
     let prefix_dir = canonical(&PathBuf::from(
         run(&lean_dir, "lake", &["env", "lean", "--print-prefix"]).trim(),
     ));
-    if let Some(sysroot) = env::var_os("LEAN_SYSROOT") {
-        let sysroot = canonical(&PathBuf::from(sysroot));
-        if sysroot != prefix_dir {
-            fail(format!(
-                "LEAN_SYSROOT={} would link `lean-rs-sys` against a different Lean than Lake's {}",
-                sysroot.display(),
-                prefix_dir.display()
-            ));
-        }
+    // The bindings must come from the same toolchain. `lean-rs-sys` (the
+    // project's fork) publishes the prefix and version it resolved as `links`
+    // metadata, which Cargo passes to this script as `DEP_LEANSHARED_*`; its
+    // build script reruns when `ELAN_TOOLCHAIN`, `LEAN_SYSROOT`, `ELAN_HOME`,
+    // `PATH`, or `lean.h` change, and Cargo recompiles the crate whenever that
+    // script reruns, so the values describe the bindings this build will link.
+    // This compares the bindings with Lake and with the pin; a toolchain whose
+    // contents changed behind an unchanged path is caught by the `lake env
+    // lean --version` check above.
+    let bindings_prefix = canonical(&PathBuf::from(
+        env::var_os("DEP_LEANSHARED_PREFIX").unwrap_or_else(|| {
+            fail(
+                "DEP_LEANSHARED_PREFIX is not set: `lean-rs-sys` did not publish its toolchain prefix \
+                 (is the dependency the project's fork?)"
+                    .to_string(),
+            )
+        }),
+    ));
+    if bindings_prefix != prefix_dir {
+        fail(format!(
+            "`lean-rs-sys` resolved the Lean toolchain at {} but Lake uses {}; the FFI bindings and the Lean library \
+             must come from one toolchain. LEAN_SYSROOT or PATH probably points at a different Lean than the pin",
+            bindings_prefix.display(),
+            prefix_dir.display()
+        ));
+    }
+    let bindings_version =
+        env::var("DEP_LEANSHARED_LEAN_VERSION").unwrap_or_else(|_| "<not published>".to_string());
+    if bindings_version != pinned_version {
+        fail(format!(
+            "`lean-rs-sys` was built against Lean {bindings_version} but {} pins {pinned_version}",
+            toolchain_file.display()
+        ));
     }
 
     // 2. Build the Lean library (incremental; Lake decides what is stale).
