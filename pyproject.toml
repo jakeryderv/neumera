@@ -22,10 +22,10 @@ Repository = "https://github.com/jakeryderv/neumera"
 
 [dependency-groups]
 dev = [
-  "maturin>=1.15,<2.0",
-  "pytest>=9.1.1",
-  "ruff>=0.17.3",
-  "ty>=0.0.92",
+  "maturin>=1.16.0,<2.0",
+  "pytest>=9.2.0",
+  "ruff>=0.17.4",
+  "ty>=0.0.99",
   { include-group = "commit" },
 ]
 # Commit message tooling; separate so CI can install it alone
@@ -34,7 +34,7 @@ commit = [
 ]
 
 [build-system]
-requires = ["maturin>=1.15,<2.0"]
+requires = ["maturin>=1.16.0,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
